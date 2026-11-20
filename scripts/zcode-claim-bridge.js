@@ -451,42 +451,40 @@
     if (panel || !document.body) return;
     panel = document.createElement('div');
     panel.id = 'zcode-claim-widget';
-    panel.setAttribute('style', 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483647;background:rgba(15,17,21,.97);color:#e8e8ea;border:1px solid #3a3f4b;border-radius:12px;padding:14px;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.6);font:13px system-ui');
-    panel.innerHTML = '<div style="font-weight:600;margin-bottom:8px">ZCode giveaway — auto JWT</div>' +
-      '<div id="zcode-claim-status" style="margin-bottom:8px">checking…</div>' +
+    panel.setAttribute('style', 'position:fixed;right:12px;bottom:16px;z-index:2147483647;font:13px system-ui');
+    panel.innerHTML =
+      '<button id="zcode-claim-toggle" type="button" style="background:#1F63EC;color:#fff;border:0;border-radius:999px;padding:9px 14px;box-shadow:0 6px 24px rgba(0,0,0,.45);font:600 13px system-ui">Claims</button>' +
+      '<div id="zcode-claim-body" style="display:none;position:absolute;right:0;bottom:44px;width:min(92vw,460px);background:rgba(15,17,21,.98);color:#e8e8ea;border:1px solid #3a3f4b;border-radius:12px;padding:12px;box-shadow:0 12px 40px rgba(0,0,0,.6)">' +
+      '<div id="zcode-claim-status" style="margin-bottom:6px">checking…</div>' +
       '<div id="zcode-claim-login" style="margin-bottom:8px;color:#a7f3d0">not logged in</div>' +
-      '<pre id="zcode-claim-result" style="white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto;background:#10131a;padding:8px;border-radius:8px;font-size:11px"></pre>' +
-      '<pre id="zcode-claim-keys" style="white-space:pre-wrap;word-break:break-all;max-height:100px;overflow:auto;background:#151821;padding:8px;border-radius:8px;font-size:10px;opacity:.75"></pre>' +
+      '<pre id="zcode-claim-result" style="white-space:pre-wrap;word-break:break-all;max-height:140px;overflow:auto;background:#10131a;padding:8px;border-radius:8px;font-size:11px"></pre>' +
+      '<pre id="zcode-claim-keys" style="white-space:pre-wrap;word-break:break-all;max-height:80px;overflow:auto;background:#151821;padding:8px;border-radius:8px;font-size:10px;opacity:.75"></pre>' +
       '<button id="zcode-login-global" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px">Login (Global)</button>' +
       '<button id="zcode-login-cn" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px">Login (CN)</button>' +
       '<button id="zcode-claim-retry" style="background:#7c3aed;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px">Retry</button>' +
       '<button id="zcode-claim-now" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px">Claim all</button>' +
-      '<button id="zcode-claim-open" style="background:#3b3f4a;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px">Claim page</button>' +
-      '<button id="zcode-claim-close" style="background:#3b3f4a;color:#fff;border:0;border-radius:8px;padding:7px 10px">Close</button>';
+      '<button id="zcode-claim-open" style="background:#3b3f4a;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px">Claims page</button>' +
+      '<button id="zcode-claim-close" style="background:#3b3f4a;color:#fff;border:0;border-radius:8px;padding:7px 10px">Close</button>' +
+      '</div>';
     document.body.appendChild(panel);
+    var body = panel.querySelector('#zcode-claim-body');
     statusEl = panel.querySelector('#zcode-claim-status');
     keysEl = panel.querySelector('#zcode-claim-keys');
     resultEl = panel.querySelector('#zcode-claim-result');
     loginEl = panel.querySelector('#zcode-claim-login');
+    panel.querySelector('#zcode-claim-toggle').onclick = function () {
+      body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    };
     panel.querySelector('#zcode-login-global').onclick = function () { startLogin('zai'); };
     panel.querySelector('#zcode-login-cn').onclick = function () { startLogin('zai_cn'); };
     panel.querySelector('#zcode-claim-retry').onclick = function () { push(true); };
     panel.querySelector('#zcode-claim-now').onclick = function () { runClaimWithCaptcha(); };
     panel.querySelector('#zcode-claim-open').onclick = function () {
-      window.open('http://127.0.0.1:45212/claim', '_blank');
+      window.open('/claims', '_blank');
     };
     log('info', 'claim widget ready', { debug: DEBUG, url: window.location.href });
     panel.querySelector('#zcode-claim-close').onclick = function () {
-      if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
-      if (loginTimer) {
-        clearInterval(loginTimer);
-        loginTimer = null;
-      }
-      panel = null;
-      statusEl = null;
-      keysEl = null;
-      resultEl = null;
-      loginEl = null;
+      body.style.display = 'none';
     };
   }
 
