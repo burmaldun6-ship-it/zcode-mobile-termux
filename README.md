@@ -53,26 +53,7 @@ Then press **Claim all**: if the campaign requires verification, the official Al
 CAPTCHA window opens — solve it yourself; no claim is sent before that. The standalone
 giveaway page is at `http://127.0.0.1:45212/claim` (or `zcode claim`).
 
-### Tokens widget in the chat menu
-
-The web UI also gets a compact **promo tokens widget**: a floating `🎁` pill in the
-corner of the chat interface with the number of claimable tokens. Tapping it opens a
-panel with login buttons, the list of available claim actions (per-plan **Claim**
-buttons and **Claim all**), the history of successfully received tokens
-(`GET /claim/history`) and the last claim response. Successful claims pop a
-`✅ Token claimed: …` toast and are appended to `claims.log`. The old debug panel
-(localStorage dump, raw responses) is still available with `zcodeDebug=1`.
-
-Use `zcode stop` (or `zcode kill`) to stop the server, claim server and agent, and `zcode restart` to bring them back in the background. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
-
-### zcode CLI
-
-`install.sh` installs the helper as `zcode` (into `$PREFIX/bin` on Termux, else
-`~/.local/bin`), with `zcode-promo` kept as a compatibility alias:
-`zcode open|claim|status|tokens` open pages and print claim state, and
-`zcode log|log-claim|log-claims|log-browser|log-trace|log-all|logs` tail the logs
-below (add `-f` to follow), `zcode start` launches everything, `zcode stop|kill`
-stops it, and `zcode restart` restarts it in the background.
+Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 
 ### Verbose logs
 
@@ -80,16 +61,12 @@ Logs are written to `~/.zcode-mobile/logs/`:
 
 - `official-server.log` — web server and agent (`zcode log`)
 - `claim.log` — local claim mini server (`zcode log-claim`)
-- `claims.log` — human-readable claim outcomes: `CLAIM OK plan=… message="…"`,
-  `CLAIM FAIL plan=… code=…`, and `RUN SUMMARY claimed=N failed=M` lines
-  (`zcode log-claims`). The same entries (newest first, last 50) are available
-  programmatically via `GET /claim/history`.
 - `zcode-browser.log` — widget events, written only in debug mode (`zcode log-browser`)
 - `claim-trace.log` — every upstream claim/touch/config HTTP request and response, with
   redacted JWT/captcha values (`zcode log-trace`). Enabled by default in the launcher;
   set `ZCODE_CLAIM_TRACE=0` to disable.
 
-All five logs can be followed with `zcode log-all`. To enable browser-side debug logging:
+All four logs can be followed with `zcode log-all`. To enable browser-side debug logging:
 
 ```bash
 ZCODE_CLAIM_DEBUG=1 zcode open
@@ -108,14 +85,12 @@ config/result and claim responses; JWT values are only recorded as a 12-characte
 - `scripts/termux-official.sh` — main launcher (web UI + agent + claim page)
 - `scripts/termux-client.sh` — legacy Electron-bundle backend bridge (experimental; requires extracted AppImage assets)
 - `scripts/claim-mini-server.js` — local giveaway/claim HTTP page
-- `scripts/zcode-claim-bridge.js` — injected into the web UI: tokens widget, JWT forwarding, captcha flow
-- `scripts/zcode.sh` — `zcode` CLI (logs, status, pages); installed by `install.sh`
+- `scripts/zcode-claim-bridge.js` — injected into the web UI to forward the logged-in JWT locally
 - `scripts/patch-runtime.py` — applies the server/web patches to a built release
 - `claim/` — claim/OAuth/marketing API implementation and tests
 - `backend/`, `web/` — Node bootstrap and WebView shim for the legacy APK build
 - `android/`, `builder/` — sources of the (experimental) Android APK build
-- `tests/` — claim tests (`node tests/test-claim.js`, 16/16 mocked) and
-  claim-server tests (`node tests/test-claim-server.js`, loopback only)
+- `tests/` — claim tests (`node tests/test-claim.js`, 16/16 mocked)
 
 ## Building from source
 

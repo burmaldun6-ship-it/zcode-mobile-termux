@@ -12,14 +12,6 @@ HOST="${ZCODE_HOST:-0.0.0.0}"
 
 mkdir -p "$DATA/workspace" "$DATA/logs"
 
-CURRENT_STATUS="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:${PORT}/api/server-info" || true)"
-case "$CURRENT_STATUS" in
-  200|401)
-    echo "[zcode] server already running on port ${PORT}; use 'zcode open' instead" >&2
-    exit 0
-    ;;
-esac
-
 SECRET_FILE="$DATA/credential.secret"
 if [ ! -s "$SECRET_FILE" ]; then
   head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$SECRET_FILE"

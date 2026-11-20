@@ -29,51 +29,6 @@ function getBrowserLogPath() {
   return path.join(path.dirname(getStatePath()), '..', 'logs', 'zcode-browser.log');
 }
 
-function getClaimsLogPath() {
-  return path.join(path.dirname(getStatePath()), '..', 'logs', 'claims.log');
-}
-
-function formatLogTime(date) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return pad(date.getFullYear()) + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
-    ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
-}
-
-function claimLogLine(entry) {
-  const mark = entry.ok
-    ? 'CLAIM OK  '
-    : (entry.status === 'skipped_captcha_required' ? 'CLAIM SKIP' : 'CLAIM FAIL');
-  const parts = ['[' + formatLogTime(new Date(entry.ts)) + ']', mark, 'plan=' + entry.planId];
-  if (entry.campaignId) parts.push('campaign=' + entry.campaignId);
-  if (entry.code !== undefined && entry.code !== null) parts.push('code=' + entry.code);
-  if (entry.message) parts.push('message="' + String(entry.message).slice(0, 200) + '"');
-  return parts.join(' ');
-}
-
-function summaryLogLine(entry) {
-  return '[' + formatLogTime(new Date(entry.ts)) + '] RUN SUMMARY claimed=' + entry.claimedCount +
-    ' failed=' + entry.failedCount + ' captchaRequired=' + entry.captchaRequired + ' ok=' + entry.ok;
-}
-
-function appendClaimsLog(lines) {
-  const file = getClaimsLogPath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, lines.join('\n') + '\n');
-}
-
-// Persist claim outcomes (newest first, capped) and append human-readable
-// lines to claims.log. Entries must never contain the JWT.
-function recordClaimHistory(entries) {
-  if (!Array.isArray(entries) || !entries.length) return;
-  const stamped = entries.map((entry) => ({ ts: new Date().toISOString(), ...entry }));
-  const current = loadState();
-  const history = [...stamped, ...(Array.isArray(current.history) ? current.history : [])].slice(0, 50);
-  saveState({ history });
-  try {
-    appendClaimsLog(stamped.map((entry) => entry.type === 'summary' ? summaryLogLine(entry) : claimLogLine(entry)));
-  } catch (err) {}
-}
-
 function defaultState() {
   return {
     jwt: '',
@@ -85,7 +40,6 @@ function defaultState() {
     pendingState: null,
     authorizeUrl: null,
     lastResult: null,
-    history: [],
     updatedAt: null,
   };
 }
@@ -262,7 +216,7 @@ function providerFromBody(body) {
   return once;
 }
 
-async function runClaimAll(body, { fetchImpl } = {}) {
+async function runClaimAll(body) {
   const state = loadState();
   const overrides = {};
   for (const key of ['jwt', 'deviceMid', 'locale', 'platform']) {
@@ -270,36 +224,14 @@ async function runClaimAll(body, { fetchImpl } = {}) {
   }
   const effective = { ...state, ...overrides };
   const provider = providerFromBody(body);
-  const onlyPlanId = body.planId ?? body.onlyPlanId;
   const result = await claim.claimAll({
     jwt: effective.jwt,
     deviceMid: effective.deviceMid,
     locale: effective.locale,
     platform: effective.platform,
     seq: state.seq,
-    onlyPlanId,
     captchaProvider: provider || undefined,
-    fetchImpl,
   });
-  const historyEntries = result.actions.map((action) => ({
-    type: 'claim',
-    ok: !!(action.claim && action.claim.success),
-    status: action.status,
-    planId: action.planId,
-    campaignId: action.campaignId,
-    code: action.claim ? action.claim.code : (action.error ? action.error.code : null),
-    message: action.claim
-      ? action.claim.message
-      : (action.error ? action.error.message : (result.captcha.reason || null)),
-  }));
-  historyEntries.push({
-    type: 'summary',
-    ok: result.ok,
-    claimedCount: result.claimedCount,
-    failedCount: result.failedCount,
-    captchaRequired: !!result.captcha.required,
-  });
-  recordClaimHistory(historyEntries);
   saveState({
     seq: state.seq + 1,
     jwt: effective.jwt,
@@ -405,13 +337,6 @@ async function routeRequest(req, res) {
 
   if (route === '/claim/status' && method === 'GET') {
     sendJson(req, res, 200, { ok: true, state: publicState(loadState()) });
-    return;
-  }
-
-  if (route === '/claim/history' && method === 'GET') {
-    const state = loadState();
-    const history = Array.isArray(state.history) ? state.history.slice(0, 50) : [];
-    sendJson(req, res, 200, { ok: true, history, claimsLogPath: getClaimsLogPath() });
     return;
   }
 
@@ -576,12 +501,10 @@ module.exports = {
   DEFAULT_CALLBACK_PORT,
   getStatePath,
   getBrowserLogPath,
-  getClaimsLogPath,
   defaultState,
   loadState,
   saveState,
   publicState,
-  recordClaimHistory,
   corsHeaders,
   readJsonBody,
   startOAuth,

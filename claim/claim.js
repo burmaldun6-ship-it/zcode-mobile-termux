@@ -465,7 +465,6 @@ async function claimAll({
   platform = DEFAULT_PLATFORM,
   captchaProvider,
   seq = 1,
-  onlyPlanId,
   fetchImpl,
 } = {}) {
   const result = {
@@ -506,11 +505,8 @@ async function claimAll({
   }
 
   const actions = extractClaimActions(touch.deliveries);
-  const selected = (onlyPlanId === undefined || onlyPlanId === null || onlyPlanId === '')
-    ? actions
-    : actions.filter((action) => String(action.planId) === String(onlyPlanId));
-  result.actions = selected.map((action) => ({ ...action, status: 'pending' }));
-  trace('claim_all_actions', { count: selected.length, onlyPlanId: onlyPlanId ?? null, actions: selected });
+  result.actions = actions.map((action) => ({ ...action, status: 'pending' }));
+  trace('claim_all_actions', { count: actions.length, actions });
   if (!actions.length) {
     result.ok = true;
     result.verification = {
@@ -724,7 +720,7 @@ async function runCli(argv) {
       const captchaProvider = verifyParam
         ? async () => ({ verifyParam, region })
         : undefined;
-      return claimAll({ ...base, seq, onlyPlanId: args['plan-id'], captchaProvider });
+      return claimAll({ ...base, seq, captchaProvider });
     }
     default:
       throw new ZCodeError('unknown command: ' + command, { name: 'UsageError' });

@@ -87,8 +87,6 @@ await c.claimPlan({ jwt, planId, platform, captchaVerifyParam, captchaRegion, de
 await c.reportTouchAction({ jwt, deviceMid, locale, campaignId, actionType: 'confirm' });
 await c.verifyClaim({ jwt, deviceMid, platform });
 await c.claimAll({ jwt, deviceMid, locale, platform, captchaProvider });
-// pass onlyPlanId to claim a single plan out of the campaign list
-await c.claimAll({ jwt, deviceMid, locale, platform, captchaProvider, onlyPlanId: 'plan-A' });
 ```
 
 `claimAll()` result shape:
@@ -155,24 +153,10 @@ node claim/claim-server.js                 # listens on 127.0.0.1:45210
 ZCODE_OAUTH_CALLBACK=1 node claim/claim-server.js   # also listen on 127.0.0.1:45211
 ```
 
-State (`jwt`, `deviceMid`, `seq`, locale, platform, pending OAuth state, claim `history`)
-is persisted to `process.env.ZCODE_DATA_BASE_DIR` (a directory, or a `.json` file path) or
+State (`jwt`, `deviceMid`, `seq`, locale, platform, pending OAuth state) is persisted to
+`process.env.ZCODE_DATA_BASE_DIR` (a directory, or a `.json` file path) or
 `$HOME/.zcode/v2/claim-state.json` with mode `0600`. The JWT is never returned by
-`GET /claim/status` or `/claim/history`. CORS is allowed only for `http://127.0.0.1:*`.
-
-### Claim log
-
-Every `claim-all` / single-plan claim appends human-readable lines to
-`~/.zcode-mobile/logs/claims.log` (or `<ZCODE_DATA_BASE_DIR>/../logs/claims.log`):
-
-```
-[2026-11-20 21:30:12] CLAIM OK  plan=plan-A campaign=cmp-banner code=0 message="ok"
-[2026-11-20 21:30:13] CLAIM FAIL plan=plan-B campaign=cmp-popup code=1003 message="failure 1003"
-[2026-11-20 21:30:13] RUN SUMMARY claimed=1 failed=1 captchaRequired=false ok=false
-```
-
-The same outcomes are stored in the state file's `history` array (newest first, capped at
-50, JWT-free) and served by `GET /claim/history`.
+`GET /claim/status`. CORS is allowed only for `http://127.0.0.1:*`.
 
 ### Endpoints
 
@@ -180,9 +164,8 @@ The same outcomes are stored in the state file's `history` array (newest first, 
 | --- | --- | --- |
 | `POST /claim/start` | `{jwt?, code?, state?, url?, deviceMid?, locale?, platform?, redirectUri?}` | With `jwt`: stores it. With `code`/`state`/`url`: exchanges it. Otherwise: creates `state` + `authorizeUrl` to open in the WebView. |
 | `GET /claim/status` | — | `{ok:true,state:{configured,deviceMid,seq,pendingState,authorizeUrl,...}}` (no JWT). |
-| `GET /claim/history` | — | `{ok:true,history:[...],claimsLogPath}` — the last 50 recorded claim outcomes, newest first (no JWT). |
 | `GET /claim/campaigns` | — | Touch result plus `claimActions`; increments stored `seq`. |
-| `POST /claim/claim-all` | `{captchaVerifyParam?,captchaRegion?,planId?,jwt?,deviceMid?,locale?,platform?}` | Full `claimAll()` result. A supplied verify param is used as a one-shot captcha provider; `planId` restricts the run to a single plan. |
+| `POST /claim/claim-all` | `{captchaVerifyParam?,captchaRegion?,jwt?,deviceMid?,locale?,platform?}` | Full `claimAll()` result. A supplied verify param is used as a one-shot captcha provider. |
 | `POST /claim/report` | `{campaignId,actionType}` | Confirm/cancel a delivery. |
 | `POST /claim/oauth-callback` | `{url?,code?,state?}` | WebView forwards the `zcode://` redirect here; exchanges the code and stores the JWT. |
 
