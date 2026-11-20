@@ -257,6 +257,34 @@ async function routeRequest(req, res) {
     return;
   }
 
+  if (route === '/claim/oauth-cli/init' && method === 'POST') {
+    const body = await readJsonBody(req);
+    const upstream = await fetch('https://zcode.z.ai/api/v1/oauth/cli/init', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: req.headers.authorization || ''
+      },
+      body: JSON.stringify({ provider: body.provider })
+    });
+    const text = await upstream.text();
+    res.writeHead(upstream.status, corsHeaders(req));
+    res.end(text);
+    return;
+  }
+
+  const pollMatch = route.match(/^\/claim\/oauth-cli\/poll\/(.+)$/);
+  if (pollMatch && method === 'GET') {
+    const flowId = decodeURIComponent(pollMatch[1]);
+    const upstream = await fetch('https://zcode.z.ai/api/v1/oauth/cli/poll/' + encodeURIComponent(flowId), {
+      headers: { Authorization: req.headers.authorization || '' }
+    });
+    const text = await upstream.text();
+    res.writeHead(upstream.status, corsHeaders(req));
+    res.end(text);
+    return;
+  }
+
   if (route === '/claim/auto-token' && method === 'POST') {
     const body = await readJsonBody(req);
     const jwt = typeof body.jwt === 'string' ? body.jwt.trim() : '';
