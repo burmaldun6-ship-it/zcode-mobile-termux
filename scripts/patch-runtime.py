@@ -21,7 +21,8 @@ if patched != text:
 
 text = web.read_text(encoding="utf-8")
 text = re.sub(r'\s*<script src="/zcode-claim-bridge\.js"></script>\s*', '\n  ', text, count=1)
-if "zcode-claim-widget" not in text and "</body>" in text:
+text = re.sub(r'<script>[\s\S]*?zcode-claim-widget[\s\S]*?</script>\s*', '', text, count=1)
+if "</body>" in text:
     inline = "<script>\n" + bridge.read_text(encoding="utf-8") + "</script>\n  "
     text = text.replace("</body>", inline + "</body>", 1)
     web.write_text(text, encoding="utf-8")
