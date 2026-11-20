@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # zcode — CLI helper for the ZCode Termux web client.
-# Installed by install.sh as $PREFIX/bin/zcode-promo (Termux) or ~/.local/bin/zcode-promo.
+# Installed by install.sh as $PREFIX/bin/zcode (Termux) or ~/.local/bin/zcode.
 set -uo pipefail
 
 DATA="${ZCODE_MOBILE_DATA:-$HOME/.zcode-mobile}"
@@ -43,7 +43,11 @@ EOF
 web_url() {
   local token=""
   [ -s "$TOKEN_FILE" ] && token="$(cat "$TOKEN_FILE")"
-  echo "http://127.0.0.1:${PORT}/?token=${token}"
+  local url="http://127.0.0.1:${PORT}/?token=${token}&_=$(date +%s)"
+  if [ "${ZCODE_CLAIM_DEBUG:-0}" = 1 ]; then
+    url="${url}&zcodeDebug=1"
+  fi
+  echo "$url"
 }
 
 open_url() {

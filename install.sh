@@ -23,20 +23,30 @@ fi
 chmod +x "$ROOT"/scripts/*.sh "$ROOT"/claim/*.js 2>/dev/null || true
 mkdir -p "$DATA/workspace" "$DATA/logs"
 
-# Install the companion CLI without replacing the main zcode launcher.
-BIN_TARGET="${PREFIX:-}/bin/zcode-promo"
-if [ -z "${PREFIX:-}" ] || [ ! -w "${PREFIX:-}/bin" ]; then
-  BIN_TARGET="$HOME/.local/bin/zcode-promo"
-  mkdir -p "$HOME/.local/bin"
+# Install the friend's helper as the primary `zcode` command.
+BIN_DIR="${PREFIX:-}/bin"
+if [ -z "${PREFIX:-}" ] || [ ! -w "$BIN_DIR" ]; then
+  BIN_DIR="$HOME/.local/bin"
+  mkdir -p "$BIN_DIR"
 fi
+BIN_TARGET="$BIN_DIR/zcode"
 cat > "$BIN_TARGET" <<EOF
 #!/usr/bin/env bash
 export ZCODE_PROJECT="$ROOT"
 exec bash "$ROOT/scripts/zcode.sh" "\$@"
 EOF
 chmod +x "$BIN_TARGET" \
-  && echo "[OK] zcode-promo CLI installed: $BIN_TARGET" \
-  || echo "[WARN] could not install zcode-promo CLI to $BIN_TARGET"
+  && echo "[OK] zcode CLI installed: $BIN_TARGET" \
+  || echo "[WARN] could not install zcode CLI to $BIN_TARGET"
+
+ALIAS_TARGET="$BIN_DIR/zcode-promo"
+if [ ! -e "$ALIAS_TARGET" ]; then
+  cat > "$ALIAS_TARGET" <<EOF
+#!/usr/bin/env bash
+exec "$BIN_TARGET" "\$@"
+EOF
+  chmod +x "$ALIAS_TARGET" || true
+fi
 
 echo "[OK] ready"
 echo "Run:  bash $ROOT/scripts/termux-official.sh"
