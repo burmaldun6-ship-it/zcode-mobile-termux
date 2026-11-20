@@ -21,7 +21,16 @@ Real chat and claims require a ZCode/z.ai account (JWT). No credentials are bund
 - A release tarball from GitHub Releases: no prebuilt binaries are stored in this repository.
   GitHub Actions builds them from upstream source in public, then publishes a **test** release.
 
-## Quick start
+## Quick start (one command)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/burmaldun6-ship-it/zcode-mobile-termux/main/install-remote.sh | bash
+```
+
+The installer downloads the latest public release tarball via the GitHub API,
+extracts it to `~/zcode-mobile-termux` and runs `install.sh` for you.
+
+Or manually:
 
 1. Download `zcode-mobile-termux-*.tar.gz` from the Releases page.
 2. Extract it in Termux, for example:
