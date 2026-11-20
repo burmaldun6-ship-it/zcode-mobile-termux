@@ -23,15 +23,20 @@ fi
 chmod +x "$ROOT"/scripts/*.sh "$ROOT"/claim/*.js 2>/dev/null || true
 mkdir -p "$DATA/workspace" "$DATA/logs"
 
-# Install the zcode CLI (log/status/page helpers).
-BIN_TARGET="${PREFIX:-}/bin/zcode"
+# Install the companion CLI without replacing the main zcode launcher.
+BIN_TARGET="${PREFIX:-}/bin/zcode-promo"
 if [ -z "${PREFIX:-}" ] || [ ! -w "${PREFIX:-}/bin" ]; then
-  BIN_TARGET="$HOME/.local/bin/zcode"
+  BIN_TARGET="$HOME/.local/bin/zcode-promo"
   mkdir -p "$HOME/.local/bin"
 fi
-cp "$ROOT/scripts/zcode.sh" "$BIN_TARGET" && chmod +x "$BIN_TARGET" \
-  && echo "[OK] zcode CLI installed: $BIN_TARGET" \
-  || echo "[WARN] could not install zcode CLI to $BIN_TARGET"
+cat > "$BIN_TARGET" <<EOF
+#!/usr/bin/env bash
+export ZCODE_PROJECT="$ROOT"
+exec bash "$ROOT/scripts/zcode.sh" "\$@"
+EOF
+chmod +x "$BIN_TARGET" \
+  && echo "[OK] zcode-promo CLI installed: $BIN_TARGET" \
+  || echo "[WARN] could not install zcode-promo CLI to $BIN_TARGET"
 
 echo "[OK] ready"
 echo "Run:  bash $ROOT/scripts/termux-official.sh"

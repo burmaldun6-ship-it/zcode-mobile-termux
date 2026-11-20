@@ -65,12 +65,13 @@ buttons and **Claim all**), the history of successfully received tokens
 
 Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 
-### zcode CLI
+### zcode-promo CLI
 
-`install.sh` installs a `zcode` helper (into `$PREFIX/bin` on Termux, else
-`~/.local/bin`): `zcode open|claim|status|tokens` open pages and print claim state,
-and `zcode log|log-claim|log-claims|log-browser|log-trace|log-all|logs` tail the logs
-below (add `-f` to follow), `zcode start` launches everything.
+`install.sh` installs a `zcode-promo` helper (into `$PREFIX/bin` on Termux, else
+`~/.local/bin`) without replacing the main `zcode` launcher:
+`zcode-promo open|claim|status|tokens` open pages and print claim state, and
+`zcode-promo log|log-claim|log-claims|log-browser|log-trace|log-all|logs` tail the logs
+below (add `-f` to follow), `zcode-promo start` launches everything.
 
 ### Verbose logs
 
@@ -107,7 +108,7 @@ config/result and claim responses; JWT values are only recorded as a 12-characte
 - `scripts/termux-client.sh` — legacy Electron-bundle backend bridge (experimental; requires extracted AppImage assets)
 - `scripts/claim-mini-server.js` — local giveaway/claim HTTP page
 - `scripts/zcode-claim-bridge.js` — injected into the web UI: tokens widget, JWT forwarding, captcha flow
-- `scripts/zcode.sh` — `zcode` CLI (logs, status, pages); installed by `install.sh`
+- `scripts/zcode.sh` — `zcode-promo` CLI (logs, status, pages); installed by `install.sh`
 - `scripts/patch-runtime.py` — applies the server/web patches to a built release
 - `claim/` — claim/OAuth/marketing API implementation and tests
 - `backend/`, `web/` — Node bootstrap and WebView shim for the legacy APK build

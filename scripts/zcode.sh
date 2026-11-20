@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # zcode — CLI helper for the ZCode Termux web client.
-# Installed by install.sh as $PREFIX/bin/zcode (Termux) or ~/.local/bin/zcode.
+# Installed by install.sh as $PREFIX/bin/zcode-promo (Termux) or ~/.local/bin/zcode-promo.
 set -uo pipefail
 
 DATA="${ZCODE_MOBILE_DATA:-$HOME/.zcode-mobile}"
@@ -11,7 +11,7 @@ TOKEN_FILE="$DATA/web-token"
 LOG_LINES="${ZCODE_LOG_LINES:-40}"
 
 SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-ROOT="$(dirname "$(dirname "$SELF")")"
+ROOT="${ZCODE_PROJECT:-$(dirname "$(dirname "$SELF")")}"
 
 usage() {
   cat <<'EOF'
