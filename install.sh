@@ -23,7 +23,15 @@ fi
 chmod +x "$ROOT"/scripts/*.sh "$ROOT"/claim/*.js 2>/dev/null || true
 mkdir -p "$DATA/workspace" "$DATA/logs"
 
+if command -v zcode >/dev/null 2>&1; then
+  ZCODE_BIN="$(command -v zcode)"
+else
+  ZCODE_BIN="$PREFIX/bin/zcode"
+fi
+cp "$ROOT/scripts/zcode.sh" "$ZCODE_BIN" 2>/dev/null || cp "$ROOT/scripts/zcode.sh" "$HOME/.local/bin/zcode" 2>/dev/null || true
+chmod +x "$ZCODE_BIN" "$HOME/.local/bin/zcode" 2>/dev/null || true
+
 echo "[OK] ready"
-echo "Run:  bash $ROOT/scripts/termux-official.sh"
+echo "Run:  zcode start"
 echo "Open: http://127.0.0.1:3030/?token=\$(cat $DATA/web-token)"
-echo "Giveaways: http://127.0.0.1:45212/claim"
+echo "Giveaways: http://127.0.0.1:3030/claims"
