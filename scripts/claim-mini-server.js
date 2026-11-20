@@ -65,6 +65,15 @@ http.createServer(async (req, res) => {
         deviceMid: body.deviceMid || state.deviceMid,
         locale: body.locale || state.locale,
       });
+      claimServer.recordClaimHistory([{
+        type: 'claim',
+        ok: !!result.success,
+        status: result.success ? 'claimed' : (result.terminal ? 'claim_failed_terminal' : 'claim_failed'),
+        planId: body.planId || body.plan_id || 'unknown',
+        code: result.code,
+        message: result.message,
+      }]);
+      console.log('[claim] single plan ' + (body.planId || body.plan_id) + ' ok=' + !!result.success + ' code=' + result.code);
       send(res, 200, Object.assign({ ok: !!result.success }, result));
     } catch (e) {
       send(res, 500, { ok: false, error: e.message });
