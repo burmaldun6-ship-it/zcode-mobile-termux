@@ -11,8 +11,9 @@ access to the Termux filesystem and packages.
 - Agent: official `zcode.cjs` agent bundle, spawned with `app-server --stdio`.
 - Shell: `SHELL`/`PATH` point to Termux, so agent Bash commands run via `/data/data/com.termux/files/usr/bin/bash -c -l`.
 - Giveaways: local claim page (see `claim/`), talks to the same ZCode endpoints as the desktop widget.
-  The JWT is picked up automatically from the official web session — no manual copy/paste needed.
-  A widget embedded in the web page shows detection status and sends the token to the local claim server.
+  A widget embedded in the web page performs the official OAuth CLI-poll login, obtains the JWT
+  (`data.token`) and sends it to the local claim server — no manual copy/paste needed.
+  Claims are gated behind the official Aliyun CAPTCHA SDK solved interactively by the user.
 
 Real chat and claims require a ZCode/z.ai account. No credentials are bundled.
 
@@ -46,9 +47,11 @@ Or manually:
 Open the printed URL, e.g. `http://127.0.0.1:3030/?token=<token>`.
 From another device on the same Wi-Fi use the printed LAN URL.
 
-After logging in once in the ZCode web tab, open the giveaway page
-`http://127.0.0.1:45212/claim` (or `zcode claim`). The JWT is sent automatically
-from the web session; use **Claim all**. A manual JWT field is kept as fallback.
+In the centre widget, press **Login (Global)** (or **Login (CN)**) and finish the popup
+login. The widget stores the JWT and forwards it to the claim server automatically.
+Then press **Claim all**: if the campaign requires verification, the official Aliyun
+CAPTCHA window opens — solve it yourself; no claim is sent before that. The standalone
+giveaway page is at `http://127.0.0.1:45212/claim` (or `zcode claim`).
 
 Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 

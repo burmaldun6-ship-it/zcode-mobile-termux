@@ -80,7 +80,7 @@ function defaultHandlers(overrides = {}) {
     }),
     'GET /api/v1/client/configs': () => jsonResponse({
       code: 0,
-      data: { configs: { enabled: false } },
+      data: { configs: { captcha: { enabled: false } } },
     }),
     'POST /api/v1/zcode-plan/billing/claim': () => jsonResponse({
       code: 0,
@@ -168,7 +168,7 @@ test('preview and captcha-config include app_version/platform and config is norm
 
 test('captcha config is disabled when fields are missing even if enabled=true', async () => {
   const fetchImpl = createMockFetch(defaultHandlers({
-    'GET /api/v1/client/configs': () => jsonResponse({ code: 0, data: { configs: { enabled: true } } }),
+    'GET /api/v1/client/configs': () => jsonResponse({ code: 0, data: { configs: { captcha: { enabled: true } } } }),
   }));
   const config = await claim.getCaptchaConfig({ jwt: 'j', fetchImpl });
   assert.equal(config.config.enabled, true);
@@ -243,7 +243,7 @@ test('claimAll with enabled captcha and no provider skips claims', async () => {
   const fetchImpl = createMockFetch(defaultHandlers({
     'GET /api/v1/client/configs': () => jsonResponse({
       code: 0,
-      data: { configs: { enabled: true, region: 'cn-shanghai', prefix: 'x', sceneId: 'scene-1' } },
+      data: { configs: { captcha: { enabled: true, region: 'cn-shanghai', prefix: 'x', sceneId: 'scene-1' } } },
     }),
   }));
   const result = await claim.claimAll({ jwt: 'j', deviceMid: 'd', fetchImpl });
@@ -260,7 +260,7 @@ test('claimAll with enabled captcha uses provider verify param', async () => {
   const fetchImpl = createMockFetch(defaultHandlers({
     'GET /api/v1/client/configs': () => jsonResponse({
       code: 0,
-      data: { configs: { enabled: true, region: 'cn-shanghai', prefix: 'x', sceneId: 'scene-1' } },
+      data: { configs: { captcha: { enabled: true, region: 'cn-shanghai', prefix: 'x', sceneId: 'scene-1' } } },
     }),
   }));
   let providerCalls = 0;

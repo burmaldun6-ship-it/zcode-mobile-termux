@@ -284,7 +284,8 @@ async function getCaptchaConfig({ jwt, platform = DEFAULT_PLATFORM, fetchImpl } 
     fetchImpl,
   });
   assertOk(json, 'getCaptchaConfig');
-  const rawConfig = (json.data && json.data.configs) || {};
+  const configs = (json.data && json.data.configs) || {};
+  const rawConfig = configs.captcha || {};
   const config = {
     enabled: rawConfig.enabled === true,
     region: rawConfig.region ?? null,

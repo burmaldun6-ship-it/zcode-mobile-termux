@@ -41,7 +41,7 @@ back as numeric strings (`"0"` → `0`), parses non-JSON bodies into a `ParseErr
 | Report action | `POST /api/v1/marketing/touch/action` body `{campaign_id,action_type:"confirm"\|"cancel"}` → `{code:0}` |
 | Claim | `POST /api/v1/zcode-plan/billing/claim` body `{plan_id}` → `{code:0,data:{plan,server_time,message}}` |
 | Preview | `GET /api/v1/zcode-plan/billing/preview?app_version=3.18.2&platform=linux-arm64` → `{code:0,data:{plans:[{planId,...}]}}` |
-| Captcha config | `GET /api/v1/client/configs?app_version=3.18.2&platform=linux-arm64` → `{data:{configs:{enabled,region,prefix,sceneId}}}` |
+| Captcha config | `GET /api/v1/client/configs?app_version=3.18.2&platform=linux-arm64` → `{data:{configs:{captcha:{enabled,region,prefix,sceneId}}}}` |
 | OAuth token | `POST /api/v1/oauth/token` body `{provider:"zai",code,redirect_uri,state}` → `{code:0,data:{token:"<JWT>"}}` |
 
 Delivery filtering: `extractClaimActions()` keeps only the **first valid** delivery per

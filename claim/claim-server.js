@@ -302,6 +302,16 @@ async function routeRequest(req, res) {
     return;
   }
 
+  if (route === '/claim/captcha-config' && method === 'POST') {
+    const body = await readJsonBody(req);
+    const state = loadState();
+    const jwt = typeof body.jwt === 'string' && body.jwt ? body.jwt : state.jwt;
+    const platform = typeof body.platform === 'string' && body.platform ? body.platform : state.platform;
+    const result = await claim.getCaptchaConfig({ jwt, platform });
+    sendJson(req, res, 200, { ok: true, ...result });
+    return;
+  }
+
   if (route === '/claim/status' && method === 'GET') {
     sendJson(req, res, 200, { ok: true, state: publicState(loadState()) });
     return;

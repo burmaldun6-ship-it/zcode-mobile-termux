@@ -4,6 +4,10 @@
   var CLAIM_ENDPOINT = CLAIM_BASE + '/claim/claim-all';
   var OAUTH_INIT_ENDPOINT = CLAIM_BASE + '/claim/oauth-cli/init';
   var OAUTH_POLL_ENDPOINT = CLAIM_BASE + '/claim/oauth-cli/poll/';
+  var CAPTCHA_CONFIG_ENDPOINT = CLAIM_BASE + '/claim/captcha-config';
+  var CAPTCHA_SDK_URL = 'https://o.alicdn.com/captcha-frontend/aliyunCaptcha/AliyunCaptcha.js';
+  var captchaSdkPromise = null;
+  var captchaBusy = false;
   var seen = null;
   var autoClaimed = false;
   var panel = null;
@@ -99,6 +103,146 @@
 
   function setLogin(text) {
     if (loginEl) loginEl.textContent = text;
+  }
+
+  function ensureCaptchaMount() {
+    if (document.getElementById('zcode-aliyun-captcha-container')) return;
+    var host = document.createElement('div');
+    host.id = 'zcode-aliyun-captcha-container';
+    host.setAttribute('aria-hidden', 'true');
+    host.setAttribute('style', 'position:fixed;left:0;top:0;z-index:2147483647;width:0;height:0;overflow:visible');
+    host.innerHTML = '<div id="zcode-aliyun-captcha-element" style="position:absolute;left:0;top:0;width:0;height:0;overflow:visible"></div>' +
+      '<button id="zcode-aliyun-captcha-button" type="button" tabindex="-1" aria-hidden="true" style="position:fixed;left:50%;top:50%;width:1px;height:1px;border:0;padding:0;transform:translate(-50%,-50%);opacity:0"></button>';
+    (document.body || document.documentElement).appendChild(host);
+  }
+
+  function loadCaptchaSdk() {
+    if (typeof window.initAliyunCaptcha === 'function') return Promise.resolve();
+    if (captchaSdkPromise) return captchaSdkPromise;
+    captchaSdkPromise = new Promise(function (resolve, reject) {
+      var existing = document.querySelector('script[src="' + CAPTCHA_SDK_URL + '"]');
+      if (existing) {
+        existing.addEventListener('load', function () { resolve(); }, { once: true });
+        existing.addEventListener('error', function () {
+          captchaSdkPromise = null;
+          reject(new Error('Failed to load captcha script.'));
+        }, { once: true });
+        return;
+      }
+      var script = document.createElement('script');
+      script.src = CAPTCHA_SDK_URL;
+      script.async = true;
+      script.onload = function () { resolve(); };
+      script.onerror = function () {
+        captchaSdkPromise = null;
+        reject(new Error('Failed to load captcha script.'));
+      };
+      document.head.appendChild(script);
+    });
+    return captchaSdkPromise;
+  }
+
+  function solveCaptcha(config) {
+    ensureCaptchaMount();
+    if (captchaBusy) return Promise.reject(new Error('Captcha verification is already in progress.'));
+    if (config.enabled === false || !config.region || !config.prefix || !config.sceneId) {
+      return Promise.reject(new Error('Request verification configuration is invalid'));
+    }
+    captchaBusy = true;
+    return loadCaptchaSdk().then(function () {
+      return new Promise(function (resolve, reject) {
+        if (typeof window.initAliyunCaptcha !== 'function') {
+          captchaBusy = false;
+          reject(new Error('Captcha SDK is unavailable.'));
+          return;
+        }
+        var button = document.getElementById('zcode-aliyun-captcha-button');
+        var settled = false;
+        var timer = null;
+        var language = (document.documentElement.lang || navigator.language || 'en').toLowerCase().startsWith('zh') ? 'cn' : 'en';
+        function finish(err, value) {
+          if (settled) return;
+          settled = true;
+          captchaBusy = false;
+          if (timer) clearTimeout(timer);
+          try { window.AliyunCaptchaConfig = null; } catch (e) {}
+          if (err) reject(err); else resolve(value);
+        }
+        timer = setTimeout(function () {
+          finish(new Error('Captcha verification timed out after 120000ms.'));
+        }, 120000);
+        window.AliyunCaptchaConfig = { region: config.region, prefix: config.prefix };
+        try {
+          window.initAliyunCaptcha({
+            SceneId: config.sceneId,
+            region: config.region,
+            prefix: config.prefix,
+            mode: 'popup',
+            language: language,
+            showErrorTip: false,
+            element: '#zcode-aliyun-captcha-element',
+            button: '#zcode-aliyun-captcha-button',
+            getInstance: function () {
+              setLogin('Captcha ready — please complete the verification window.');
+              if (button) button.click();
+            },
+            success: function (param) {
+              var value = typeof param === 'string' ? param.trim() : '';
+              if (!value) return;
+              finish(null, { captchaVerifyParam: value, captchaRegion: config.region });
+            },
+            fail: function (result) {
+              var terminal = result && (result.captchaVerifyParam || result.CaptchaVerifyParam);
+              if (typeof terminal === 'string' && terminal.trim()) {
+                finish(null, { captchaVerifyParam: terminal.trim(), captchaRegion: config.region });
+                return;
+              }
+              var code = result && (result.verifyCode || result.VerifyCode || result.code);
+              var needUi = result && result.success === true && result.verifyResult === false && (!code || code === 'F015');
+              if (needUi && button) {
+                setLogin('Please complete the verification puzzle in the window.');
+                button.click();
+                return;
+              }
+              finish(new Error('Captcha failed: ' + (code || 'unknown')));
+            },
+            onError: function (err) {
+              finish(err instanceof Error ? err : new Error(String(err)));
+            }
+          });
+        } catch (err) {
+          finish(err);
+        }
+      });
+    }).catch(function (err) {
+      captchaBusy = false;
+      throw err;
+    });
+  }
+
+  function runClaimWithCaptcha() {
+    setLogin('Checking captcha requirement…');
+    return fetch(CAPTCHA_CONFIG_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    }).then(function (response) {
+      return response.json();
+    }).then(function (data) {
+      var config = data.config || {};
+      if (data.enabled && config.region && config.prefix && config.sceneId) {
+        setLogin('Captcha required — opening official verification window…');
+        return solveCaptcha(config).then(function (solved) {
+          setLogin('Captcha solved — sending claim…');
+          return claimAll(solved);
+        });
+      }
+      setLogin('No captcha required — sending claim…');
+      return claimAll();
+    }).catch(function (err) {
+      setLogin('Claim failed: ' + (err && err.message ? err.message : String(err)));
+      render(findToken(), 'claim failed', String(err && err.message ? err.message : err));
+    });
   }
 
   function randomHex(bytes) {
@@ -197,11 +341,12 @@
     });
   }
 
-  function claimAll() {
+  function claimAll(captcha) {
+    ensureCaptchaMount();
     return fetch(CLAIM_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '{}'
+      body: JSON.stringify(captcha || {})
     }).then(function (response) {
       return response.json().catch(function () { return { httpStatus: response.status }; });
     }).then(function (data) {
@@ -236,7 +381,7 @@
         render(found, 'sent to claim server');
         if (!autoClaimed) {
           autoClaimed = true;
-          claimAll();
+          runClaimWithCaptcha();
         }
       } else {
         render(found, 'HTTP ' + response.status);
@@ -270,7 +415,7 @@
     panel.querySelector('#zcode-login-global').onclick = function () { startLogin('zai'); };
     panel.querySelector('#zcode-login-cn').onclick = function () { startLogin('zai_cn'); };
     panel.querySelector('#zcode-claim-retry').onclick = function () { push(true); };
-    panel.querySelector('#zcode-claim-now').onclick = function () { claimAll(); };
+    panel.querySelector('#zcode-claim-now').onclick = function () { runClaimWithCaptcha(); };
     panel.querySelector('#zcode-claim-open').onclick = function () {
       window.open('http://127.0.0.1:45212/claim', '_blank');
     };
