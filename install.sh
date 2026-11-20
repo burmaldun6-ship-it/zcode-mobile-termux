@@ -23,6 +23,16 @@ fi
 chmod +x "$ROOT"/scripts/*.sh "$ROOT"/claim/*.js 2>/dev/null || true
 mkdir -p "$DATA/workspace" "$DATA/logs"
 
+# Install the zcode CLI (log/status/page helpers).
+BIN_TARGET="${PREFIX:-}/bin/zcode"
+if [ -z "${PREFIX:-}" ] || [ ! -w "${PREFIX:-}/bin" ]; then
+  BIN_TARGET="$HOME/.local/bin/zcode"
+  mkdir -p "$HOME/.local/bin"
+fi
+cp "$ROOT/scripts/zcode.sh" "$BIN_TARGET" && chmod +x "$BIN_TARGET" \
+  && echo "[OK] zcode CLI installed: $BIN_TARGET" \
+  || echo "[WARN] could not install zcode CLI to $BIN_TARGET"
+
 echo "[OK] ready"
 echo "Run:  bash $ROOT/scripts/termux-official.sh"
 echo "Open: http://127.0.0.1:3030/?token=\$(cat $DATA/web-token)"
