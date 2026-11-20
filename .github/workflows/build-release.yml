@@ -51,6 +51,10 @@ jobs:
         working-directory: upstream
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Prepare upstream SEA package dist files
+        working-directory: upstream
+        run: pnpm build:sea:prepare
+
       - name: Build upstream web + server + agent distribution
         working-directory: upstream
         run: pnpm build:zcode --base-url https://github.com/${{ github.repository }}/releases/download/
