@@ -27,6 +27,7 @@ cp -a "$UPSTREAM_DIST/web" "$STAGE/dist/web"
 cp -a "$UPSTREAM_DIST/server" "$STAGE/dist/server"
 cp -a "$UPSTREAM_DIST/agent" "$STAGE/dist/agent"
 cp -a "$UPSTREAM_DIST/node_modules" "$STAGE/dist/node_modules"
+python3 "$STAGE/scripts/patch-runtime.py" "$STAGE/dist"
 chmod +x "$STAGE"/scripts/*.sh "$STAGE/install.sh" 2>/dev/null || true
 
 tar -czf "${OUT_DIR}/${NAME}.tar.gz" -C "$OUT_DIR" "$NAME"

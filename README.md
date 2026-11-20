@@ -10,9 +10,11 @@ access to the Termux filesystem and packages.
 - Server: official `@zcode/server` (`entry-http.js`), token-protected HTTP + `/ws`.
 - Agent: official `zcode.cjs` agent bundle, spawned with `app-server --stdio`.
 - Shell: `SHELL`/`PATH` point to Termux, so agent Bash commands run via `/data/data/com.termux/files/usr/bin/bash -c -l`.
-- Giveaways: standalone claim page (see `claim/`), talks to the same ZCode endpoints as the desktop widget.
+- Giveaways: local claim page (see `claim/`), talks to the same ZCode endpoints as the desktop widget.
+  The JWT is picked up automatically from the official web session — no manual copy/paste needed.
+  A small bridge injected into the web UI sends it from the browser to the local claim server.
 
-Real chat and claims require a ZCode/z.ai account (JWT). No credentials are bundled.
+Real chat and claims require a ZCode/z.ai account. No credentials are bundled.
 
 ## Requirements
 
@@ -44,7 +46,9 @@ Or manually:
 Open the printed URL, e.g. `http://127.0.0.1:3030/?token=<token>`.
 From another device on the same Wi-Fi use the printed LAN URL.
 
-Giveaway page: `http://127.0.0.1:45212/claim` (paste JWT, then Campaigns / Claim all).
+After logging in once in the ZCode web tab, open the giveaway page
+`http://127.0.0.1:45212/claim` (or `zcode claim`). The JWT is sent automatically
+from the web session; use **Claim all**. A manual JWT field is kept as fallback.
 
 Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 
@@ -57,6 +61,8 @@ Stop with `Ctrl+C`. The web token and credential secret are generated once and s
 - `scripts/termux-official.sh` — main launcher (web UI + agent + claim page)
 - `scripts/termux-client.sh` — legacy Electron-bundle backend bridge (experimental; requires extracted AppImage assets)
 - `scripts/claim-mini-server.js` — local giveaway/claim HTTP page
+- `scripts/zcode-claim-bridge.js` — injected into the web UI to forward the logged-in JWT locally
+- `scripts/patch-runtime.py` — applies the server/web patches to a built release
 - `claim/` — claim/OAuth/marketing API implementation and tests
 - `backend/`, `web/` — Node bootstrap and WebView shim for the legacy APK build
 - `android/`, `builder/` — sources of the (experimental) Android APK build
@@ -76,8 +82,14 @@ cd upstream
 npm i -g pnpm@10.33.2
 pnpm install --frozen-lockfile
 pnpm build:zcode --base-url http://localhost/
-bash ../scripts/assemble-release.sh dist/zcode/.work/zcode ../dist-release
+UPSTREAM_VERSION=$(node -p "require('./package.json').version")
+mkdir -p unpacked
+tar -xzf "dist/zcode/releases/${UPSTREAM_VERSION}/zcode-${UPSTREAM_VERSION}.tar.gz" -C unpacked
+bash ../scripts/assemble-release.sh unpacked/zcode ../dist-release
 ```
+
+`assemble-release.sh` also runs `scripts/patch-runtime.py`, which forces the
+standalone server to treat projects as local and injects the JWT bridge.
 
 On Bionic/Termux, Vite/Rolldown native bindings may require building on a glibc host.
 

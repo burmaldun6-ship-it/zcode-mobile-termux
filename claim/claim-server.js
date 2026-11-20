@@ -257,6 +257,23 @@ async function routeRequest(req, res) {
     return;
   }
 
+  if (route === '/claim/auto-token' && method === 'POST') {
+    const body = await readJsonBody(req);
+    const jwt = typeof body.jwt === 'string' ? body.jwt.trim() : '';
+    if (!jwt) {
+      sendJson(req, res, 400, { ok: false, error: { message: 'jwt required' } });
+      return;
+    }
+    const patch = { jwt };
+    if (typeof body.locale === 'string' && body.locale) {
+      patch.locale = body.locale.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
+    }
+    if (typeof body.platform === 'string' && body.platform) patch.platform = body.platform;
+    saveState(patch);
+    sendJson(req, res, 200, { ok: true, configured: true, state: publicState(loadState()) });
+    return;
+  }
+
   if (route === '/claim/status' && method === 'GET') {
     sendJson(req, res, 200, { ok: true, state: publicState(loadState()) });
     return;
