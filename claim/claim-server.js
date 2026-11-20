@@ -25,6 +25,10 @@ function getStatePath() {
   return path.join(os.homedir(), '.zcode', 'v2', 'claim-state.json');
 }
 
+function getBrowserLogPath() {
+  return path.join(path.dirname(getStatePath()), '..', 'logs', 'zcode-browser.log');
+}
+
 function defaultState() {
   return {
     jwt: '',
@@ -312,6 +316,25 @@ async function routeRequest(req, res) {
     return;
   }
 
+  if (route === '/claim/log' && method === 'POST') {
+    const body = await readJsonBody(req);
+    const level = ['debug', 'info', 'warn', 'error'].includes(body.level) ? body.level : 'info';
+    const message = typeof body.message === 'string' ? body.message.slice(0, 2000) : '';
+    const entry = {
+      ts: new Date().toISOString(),
+      level,
+      source: typeof body.source === 'string' ? body.source.slice(0, 120) : 'browser',
+      message,
+      data: body.data,
+    };
+    const line = JSON.stringify(entry);
+    const file = getBrowserLogPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, line.slice(0, 12000) + '\n');
+    sendJson(req, res, 200, { ok: true, file });
+    return;
+  }
+
   if (route === '/claim/status' && method === 'GET') {
     sendJson(req, res, 200, { ok: true, state: publicState(loadState()) });
     return;
@@ -477,6 +500,7 @@ module.exports = {
   DEFAULT_PORT,
   DEFAULT_CALLBACK_PORT,
   getStatePath,
+  getBrowserLogPath,
   defaultState,
   loadState,
   saveState,

@@ -17,6 +17,16 @@
   var resultEl = null;
   var loginEl = null;
   var loginTimer = null;
+  var loggedJwt = null;
+  var lastPollStatus = '';
+  var LOG_ENDPOINT = CLAIM_BASE + '/claim/log';
+  if (/[?&]zcodeDebug=0/.test(window.location.search)) {
+    try { localStorage.removeItem('zcode-claim-debug'); } catch (e) {}
+  }
+  var DEBUG = /[?&]zcodeDebug=1/.test(window.location.search) || localStorage.getItem('zcode-claim-debug') === '1';
+  if (DEBUG) {
+    try { localStorage.setItem('zcode-claim-debug', '1'); } catch (e) {}
+  }
 
   function looksLikeJwt(value) {
     if (typeof value !== 'string' || value.length < 20 || value.length > 8192) return false;
@@ -69,6 +79,14 @@
         var found = walk(value, 0, key, { value: null });
         if (found.value) {
           found.value.provider = localStorage.getItem('oauth:active_provider') || '';
+          if (loggedJwt !== found.value.jwt) {
+            loggedJwt = found.value.jwt;
+            log('info', 'JWT found in browser storage', {
+              source: found.value.source,
+              provider: found.value.provider,
+              prefix: found.value.jwt.slice(0, 12)
+            });
+          }
           return found.value;
         }
       }
@@ -104,6 +122,23 @@
 
   function setLogin(text) {
     if (loginEl) loginEl.textContent = text;
+  }
+
+  function log(level, message, data) {
+    if (!DEBUG) return;
+    try { console.log('[zcode-claim] ' + message, data || ''); } catch (e) {}
+    try {
+      fetch(LOG_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: level,
+          source: 'zcode-claim-bridge',
+          message: message,
+          data: data || null
+        })
+      });
+    } catch (e) {}
   }
 
   function ensureCaptchaMount() {
@@ -231,13 +266,16 @@
       return response.json();
     }).then(function (data) {
       var config = data.config || {};
+      log('info', 'captcha config', { enabled: !!data.enabled, region: config.region || '', sceneId: config.sceneId || '' });
       if (data.enabled && config.region && config.prefix && config.sceneId) {
         setLogin('Captcha required — opening official verification window…');
         return solveCaptcha(config).then(function (solved) {
+          log('info', 'captcha solved', { region: solved.captchaRegion });
           setLogin('Captcha solved — sending claim…');
           return claimAll(solved);
         });
       }
+      log('info', 'no captcha required');
       setLogin('No captcha required — sending claim…');
       return claimAll();
     }).catch(function (err) {
@@ -294,6 +332,7 @@
       return;
     }
     setLogin('Starting ' + provider + ' login…');
+    log('info', 'login started', { provider: provider });
     var pollToken = randomHex(32);
     var deadline = Date.now() + 10 * 60 * 1000;
     fetch(OAUTH_INIT_ENDPOINT, {
@@ -310,6 +349,7 @@
       try { popup.location.href = data.authorize_url; } catch (e) {}
       var flowId = data.flow_id;
       var interval = Math.max(1000, Math.min(5000, Number(data.poll_interval_sec || 2) * 1000));
+      log('info', 'oauth init ok', { provider: provider, flowId: flowId, intervalMs: interval });
       setLogin('Browser opened — finish login, then wait…');
       loginTimer = setInterval(function () {
         if (Date.now() > deadline) {
@@ -324,7 +364,15 @@
           return response.json();
         }).then(function (pollPayload) {
           var result = pollPayload.data || {};
+          if (result.status !== lastPollStatus) {
+            lastPollStatus = result.status;
+            log('debug', 'oauth poll status', { status: result.status });
+          }
           if (result.status === 'ready' && typeof result.token === 'string' && result.token.trim()) {
+            log('info', 'oauth ready', {
+              provider: provider,
+              userId: result.user ? (result.user.user_id || result.user.id || '') : ''
+            });
             clearInterval(loginTimer);
             loginTimer = null;
             storeToken(result.token.trim(), provider, result.user);
@@ -345,6 +393,7 @@
 
   function claimAll(captcha) {
     ensureCaptchaMount();
+    log('info', 'claim request', { captchaIncluded: !!captcha });
     return fetch(CLAIM_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -352,9 +401,11 @@
     }).then(function (response) {
       return response.json().catch(function () { return { httpStatus: response.status }; });
     }).then(function (data) {
+      log('info', 'claim response', data);
       render(findToken(), 'sent to claim server', data);
       return data;
     }).catch(function (err) {
+      log('error', 'claim request failed', { message: String(err && err.message ? err.message : err) });
       render(findToken(), 'sent to claim server', 'claim request failed: ' + err);
     });
   }
@@ -369,6 +420,7 @@
       render(found, 'already sent');
       return;
     }
+    log('info', 'pushing JWT to claim server', { provider: found.provider, source: found.source });
     fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -380,6 +432,7 @@
     }).then(function (response) {
       if (response.ok) {
         seen = found.jwt;
+        log('info', 'JWT configured on claim server', { prefix: found.jwt.slice(0, 12) });
         render(found, 'sent to claim server');
         if (autoClaimPending && !autoClaimed) {
           autoClaimPending = false;
@@ -422,6 +475,7 @@
     panel.querySelector('#zcode-claim-open').onclick = function () {
       window.open('http://127.0.0.1:45212/claim', '_blank');
     };
+    log('info', 'claim widget ready', { debug: DEBUG, url: window.location.href });
     panel.querySelector('#zcode-claim-close').onclick = function () {
       if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
       if (loginTimer) {

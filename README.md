@@ -55,6 +55,24 @@ giveaway page is at `http://127.0.0.1:45212/claim` (or `zcode claim`).
 
 Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 
+### Verbose logs
+
+Logs are written to `~/.zcode-mobile/logs/`:
+
+- `official-server.log` — web server and agent (`zcode log`)
+- `claim.log` — local claim mini server (`zcode log-claim`)
+- `zcode-browser.log` — widget events, written only in debug mode (`zcode log-browser`)
+
+All three can be followed with `zcode log-all`. To enable browser-side debug logging:
+
+```bash
+ZCODE_CLAIM_DEBUG=1 zcode open
+```
+
+This adds `zcodeDebug=1` to the URL and remembers it in `localStorage`. Open with
+`zcodeDebug=0` to disable. The browser log contains timestamps, OAuth status, captcha
+config/result and claim responses; JWT values are only recorded as a 12-character prefix.
+
 ## Layout
 
 - `dist/web/` — official web client (provided by the release tarball)
