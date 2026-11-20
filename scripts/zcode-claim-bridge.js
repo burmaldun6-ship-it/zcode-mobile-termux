@@ -22,6 +22,7 @@
   var availableCount = null;
   var pill = null;
   var pillBadge = null;
+  var pillDot = null;
   var panel = null;
   var uiStatusEl = null;
   var uiLoginRow = null;
@@ -37,6 +38,39 @@
   var loggedJwt = null;
   var lastPollStatus = '';
   var LOG_ENDPOINT = CLAIM_BASE + '/claim/log';
+  // Visual tokens follow the official ZCode/Z.ai app: near-black monochrome,
+  // one #1F63EC accent, monoline SVG icons (no emoji).
+  var T = {
+    bg: 'rgba(13,13,13,.96)',
+    surface: '#1e1e20',
+    border: 'rgba(255,255,255,.08)',
+    borderStrong: 'rgba(255,255,255,.14)',
+    text: '#f3f3f3',
+    text2: '#b4b4b4',
+    text3: '#828282',
+    accent: '#1F63EC',
+    accentPress: '#1a54c8',
+    accentSoft: 'rgba(31,99,236,.12)',
+    ok: '#3fb950',
+    err: '#f85149',
+    warn: '#d29922',
+    font: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Noto Sans","Microsoft YaHei",sans-serif',
+    mono: 'ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace'
+  };
+  var ICONS = {
+    coin: '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5h5l-5 5h5"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/>',
+    x: '<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+    alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    skip: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+    zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
+    arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'
+  };
+  function icon(name, size) {
+    return '<svg width="' + (size || 14) + '" height="' + (size || 14) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>';
+  }
   if (/[?&]zcodeDebug=0/.test(window.location.search)) {
     try { localStorage.removeItem('zcode-claim-debug'); } catch (e) {}
   }
@@ -139,12 +173,20 @@
 
   function toast(message, kind) {
     if (!document.body) return;
-    var colors = { ok: '#14532d', error: '#7f1d1d', warn: '#78350f', info: '#1e3a5f' };
+    var iconName = kind === 'ok' ? 'check' : kind === 'err' ? 'x' : kind === 'warn' ? 'alert' : 'coin';
+    var color = kind === 'ok' ? T.ok : kind === 'err' ? T.err : kind === 'warn' ? T.warn : T.accent;
     var el = document.createElement('div');
     el.setAttribute('style', 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);' +
-      'z-index:2147483647;background:' + (colors[kind] || colors.info) + ';color:#fff;padding:10px 16px;' +
-      'border-radius:10px;font:13px/1.4 system-ui;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:80vw');
-    el.textContent = message;
+      'z-index:2147483647;display:flex;align-items:center;gap:9px;background:#1c1c1e;color:' + T.text + ';' +
+      'border:1px solid ' + T.borderStrong + ';border-radius:10px;padding:10px 14px;font:13px/1.4 ' + T.font + ';' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.55);max-width:calc(100vw - 32px)');
+    var ic = document.createElement('span');
+    ic.setAttribute('style', 'display:flex;flex-shrink:0;color:' + color);
+    ic.innerHTML = icon(iconName, 15);
+    var span = document.createElement('span');
+    span.textContent = message;
+    el.appendChild(ic);
+    el.appendChild(span);
     document.body.appendChild(el);
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 4500);
   }
@@ -153,7 +195,8 @@
     if (!pillBadge) return;
     var n = availableCount;
     pillBadge.textContent = (n === null || n === undefined) ? '' : String(n);
-    pill.style.borderColor = configured ? '#16a34a' : '#3a3f4b';
+    pill.style.borderColor = configured ? T.borderStrong : T.border;
+    if (pillDot) pillDot.style.background = configured ? T.ok : T.text3;
   }
 
   function render(found, state, result) {
@@ -211,8 +254,8 @@
       updateLoginRow();
       if (uiStatusEl && !claimBusy && !loginTimer) {
         uiStatusEl.textContent = configured
-          ? '✅ Logged in — JWT sent to claim server'
-          : 'Not logged in — use Login below';
+          ? 'Session active — token received from the web UI.'
+          : 'Not signed in — use the buttons below.';
       }
       return payload;
     }).catch(function () {});
@@ -236,30 +279,39 @@
     uiAvailableEl.textContent = '';
     if (!actions || !actions.length) {
       var empty = document.createElement('div');
-      empty.style.cssText = 'opacity:.7;padding:4px 0';
+      empty.style.cssText = 'color:' + T.text3 + ';padding:4px 0;font-size:12px';
       empty.textContent = configured
-        ? 'No claimable tokens right now — tap Refresh later.'
-        : 'Log in to check available tokens.';
+        ? 'No giveaways available right now — check again later.'
+        : 'Sign in to check available giveaways.';
       uiAvailableEl.appendChild(empty);
       return;
     }
     for (var i = 0; i < actions.length && i < 10; i += 1) {
       var action = actions[i];
       var row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0';
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid ' + T.border;
       var label = document.createElement('div');
       label.style.cssText = 'min-width:0';
       var title = document.createElement('div');
-      title.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-      title.textContent = (action.buttonLabel || 'Promo token') + ' — ' + action.planId;
-      var sub = document.createElement('div');
-      sub.style.cssText = 'font-size:10px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
-      sub.textContent = action.campaignId + ' · ' + action.resourcePosition;
+      title.style.cssText = 'font-size:13px;font-weight:500;color:' + T.text + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      title.textContent = action.buttonLabel || 'Promo token';
+      var meta = document.createElement('div');
+      meta.style.cssText = 'margin-top:4px;display:flex;gap:5px;flex-wrap:wrap';
+      var chip1 = document.createElement('span');
+      chip1.style.cssText = 'font:11px/1 ' + T.mono + ';color:' + T.text2 + ';background:' + T.surface + ';border:1px solid ' + T.border + ';border-radius:6px;padding:3px 6px';
+      chip1.textContent = action.planId;
+      var chip2 = document.createElement('span');
+      chip2.style.cssText = 'font:11px/1 ' + T.mono + ';color:' + T.text3 + ';border:1px solid ' + T.border + ';border-radius:6px;padding:3px 6px';
+      chip2.textContent = action.resourcePosition;
+      meta.appendChild(chip1);
+      meta.appendChild(chip2);
       label.appendChild(title);
-      label.appendChild(sub);
+      label.appendChild(meta);
       var button = document.createElement('button');
-      button.style.cssText = 'background:#2563eb;color:#fff;border:0;border-radius:7px;padding:4px 10px;cursor:pointer;flex-shrink:0;font:12px system-ui';
-      button.textContent = 'Claim';
+      button.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:' + T.accent + ';color:#fff;border:0;border-radius:8px;padding:6px 11px;cursor:pointer;flex-shrink:0;font:12px ' + T.font + ';transition:background-color .15s ease';
+      button.innerHTML = icon('zap', 12) + '<span>Claim</span>';
+      button.onmouseover = function () { this.style.backgroundColor = T.accentPress; };
+      button.onmouseout = function () { this.style.backgroundColor = T.accent; };
       button.onclick = (function (planId) {
         return function () { runClaimWithCaptcha(planId); };
       })(action.planId);
@@ -283,8 +335,8 @@
     campaignsBusy = true;
     if (uiAvailableEl && !cached) {
       var loading = document.createElement('div');
-      loading.style.cssText = 'opacity:.7;padding:4px 0';
-      loading.textContent = 'Checking available tokens…';
+      loading.style.cssText = 'color:' + T.text3 + ';padding:4px 0;font-size:12px';
+      loading.textContent = 'Loading giveaways…';
       uiAvailableEl.textContent = '';
       uiAvailableEl.appendChild(loading);
     }
@@ -302,8 +354,8 @@
     }).catch(function (err) {
       if (uiAvailableEl) {
         var failed = document.createElement('div');
-        failed.style.cssText = 'color:#fca5a5;padding:4px 0';
-        failed.textContent = 'Failed to load campaigns: ' + (err && err.message ? err.message : err);
+        failed.style.cssText = 'color:' + T.err + ';padding:4px 0;font-size:12px';
+        failed.textContent = 'Could not load giveaways: ' + (err && err.message ? err.message : err);
         uiAvailableEl.textContent = '';
         uiAvailableEl.appendChild(failed);
       }
@@ -319,25 +371,42 @@
     }).then(function (payload) {
       var history = payload && Array.isArray(payload.history) ? payload.history : [];
       uiHistoryEl.textContent = '';
-      if (!history.length) {
+      var claims = history.filter(function (e) { return e.type === 'claim'; });
+      if (!claims.length) {
         var empty = document.createElement('div');
-        empty.style.cssText = 'opacity:.6;padding:2px 0';
+        empty.style.cssText = 'color:' + T.text3 + ';padding:2px 0;font-size:12px';
         empty.textContent = 'Nothing claimed yet.';
         uiHistoryEl.appendChild(empty);
         return;
       }
       for (var i = 0; i < history.length && i < 12; i += 1) {
         var entry = history[i];
-        var line = document.createElement('div');
-        var okColor = entry.ok ? '#86efac' : (entry.status === 'skipped_captcha_required' ? '#fbbf24' : '#fca5a5');
-        line.style.cssText = 'color:' + okColor + ';padding:2px 0;word-break:break-word';
         if (entry.type === 'summary') {
-          line.textContent = '📊 claimed ' + entry.claimedCount + ', failed ' + entry.failedCount +
-            (entry.captchaRequired ? ' (captcha required)' : '') + ' — ' + fmtTime(entry.ts);
-        } else {
-          line.textContent = (entry.ok ? '✅' : '❌') + ' ' + entry.planId +
-            ' — ' + fmtTime(entry.ts) + (entry.message ? ' — ' + entry.message : '');
+          var sum = document.createElement('div');
+          sum.style.cssText = 'color:' + T.text3 + ';font-size:11px;padding:3px 0;font-variant-numeric:tabular-nums';
+          sum.textContent = 'Run: claimed ' + entry.claimedCount + ', failed ' + entry.failedCount + ' · ' + fmtTime(entry.ts);
+          uiHistoryEl.appendChild(sum);
+          continue;
         }
+        var line = document.createElement('div');
+        line.style.cssText = 'display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:12px';
+        var color = entry.ok ? T.ok : (entry.status === 'skipped_captcha_required' ? T.warn : T.err);
+        var st = document.createElement('span');
+        st.style.cssText = 'display:flex;align-self:center;flex-shrink:0;color:' + color;
+        st.innerHTML = icon(entry.ok ? 'check' : (entry.status === 'skipped_captcha_required' ? 'skip' : 'x'), 13);
+        var plan = document.createElement('span');
+        plan.style.cssText = 'font-family:' + T.mono + ';font-size:11px;color:' + T.text + ';flex-shrink:0';
+        plan.textContent = entry.planId || '?';
+        var msg = document.createElement('span');
+        msg.style.cssText = 'color:' + T.text2 + ';min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        msg.textContent = entry.ok ? (entry.message || 'claimed') : (entry.message || entry.status || 'failed');
+        var ts = document.createElement('span');
+        ts.style.cssText = 'font-family:' + T.mono + ';font-size:10px;color:' + T.text3 + ';font-variant-numeric:tabular-nums;flex-shrink:0';
+        ts.textContent = fmtTime(entry.ts);
+        line.appendChild(st);
+        line.appendChild(plan);
+        line.appendChild(msg);
+        line.appendChild(ts);
         uiHistoryEl.appendChild(line);
       }
     }).catch(function () {});
@@ -473,7 +542,7 @@
   function announceClaimResult(data) {
     if (!data || typeof data !== 'object') return;
     if (data.captcha && data.captcha.required) {
-      toast('⚠️ Captcha required before claiming', 'warn');
+      toast('Captcha required before claiming', 'warn');
       return;
     }
     var claimed = [];
@@ -486,13 +555,13 @@
       }
     }
     if (claimed.length) {
-      toast('✅ Token claimed: ' + claimed.join(', '), 'ok');
+      toast('Token claimed: ' + claimed.join(', '), 'ok');
       log('info', 'claim succeeded', { plans: claimed });
     } else if (failed.length) {
       var reason = data.errors && data.errors[0] && data.errors[0].message;
-      toast('❌ Claim failed for ' + failed.join(', ') + (reason ? ': ' + reason : ''), 'error');
+      toast('Claim failed for ' + failed.join(', ') + (reason ? ': ' + reason : ''), 'error');
     } else if (data.ok === false && data.errors && data.errors.length) {
-      toast('❌ Claim failed: ' + data.errors[0].message, 'error');
+      toast('Claim failed: ' + data.errors[0].message, 'error');
     }
   }
 
@@ -525,7 +594,7 @@
       return claimAll(undefined, planId);
     }).catch(function (err) {
       setLogin('Claim failed: ' + (err && err.message ? err.message : String(err)));
-      toast('❌ Claim failed: ' + (err && err.message ? err.message : err), 'error');
+      toast('Claim failed: ' + (err && err.message ? err.message : err), 'error');
       render(findToken(), 'claim failed', String(err && err.message ? err.message : err));
     }).then(function () {
       claimBusy = false;
@@ -629,7 +698,7 @@
             loginTimer = null;
             storeToken(result.token.trim(), provider, result.user);
             setLogin('Logged in — JWT saved, sending to claim server…');
-            toast('✅ Logged in — JWT saved', 'ok');
+            toast('Signed in — JWT saved', 'ok');
             push(true);
           } else if (result.status === 'failed') {
             clearInterval(loginTimer);
@@ -664,7 +733,7 @@
       return data;
     }).catch(function (err) {
       log('error', 'claim request failed', { message: String(err && err.message ? err.message : err) });
-      toast('❌ Claim request failed: ' + (err && err.message ? err.message : err), 'error');
+      toast('Claim request failed: ' + (err && err.message ? err.message : err), 'error');
       render(findToken(), 'sent to claim server', 'claim request failed: ' + err);
     });
   }
@@ -717,13 +786,13 @@
     if (debugPanelEl || !document.body) return;
     debugPanelEl = document.createElement('div');
     debugPanelEl.id = 'zcode-claim-widget';
-    debugPanelEl.setAttribute('style', 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483647;background:rgba(15,17,21,.97);color:#e8e8ea;border:1px solid #3a3f4b;border-radius:12px;padding:14px;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.6);font:13px system-ui');
+    debugPanelEl.setAttribute('style', 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483647;background:' + T.bg + ';color:' + T.text + ';border:1px solid ' + T.borderStrong + ';border-radius:12px;padding:14px;max-width:460px;box-shadow:0 12px 40px rgba(0,0,0,.6);font:13px ' + T.font);
     debugPanelEl.innerHTML = '<div style="font-weight:600;margin-bottom:8px">ZCode giveaway — debug</div>' +
       '<div id="zcode-claim-status" style="margin-bottom:8px">checking…</div>' +
       '<div id="zcode-claim-login" style="margin-bottom:8px;color:#a7f3d0">not logged in</div>' +
-      '<pre id="zcode-claim-result" style="white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto;background:#10131a;padding:8px;border-radius:8px;font-size:11px"></pre>' +
-      '<pre id="zcode-claim-keys" style="white-space:pre-wrap;word-break:break-all;max-height:100px;overflow:auto;background:#151821;padding:8px;border-radius:8px;font-size:10px;opacity:.75"></pre>' +
-      '<button id="zcode-claim-dbg-close" style="background:#3b3f4a;color:#fff;border:0;border-radius:8px;padding:7px 10px">Close debug</button>';
+      '<pre id="zcode-claim-result" style="white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto;background:' + T.surface + ';padding:8px;border-radius:8px;font-size:11px;font-family:' + T.mono + '"></pre>' +
+      '<pre id="zcode-claim-keys" style="white-space:pre-wrap;word-break:break-all;max-height:100px;overflow:auto;background:' + T.surface + ';padding:8px;border-radius:8px;font-size:10px;opacity:.75;font-family:' + T.mono + '"></pre>' +
+      '<button id="zcode-claim-dbg-close" style="background:' + T.surface + ';color:' + T.text + ';border:1px solid ' + T.borderStrong + ';border-radius:8px;padding:7px 10px">Close debug</button>';
     document.body.appendChild(debugPanelEl);
     statusEl = debugPanelEl.querySelector('#zcode-claim-status');
     keysEl = debugPanelEl.querySelector('#zcode-claim-keys');
@@ -748,12 +817,15 @@
     pill = document.createElement('div');
     pill.id = 'zcode-claim-pill';
     pill.setAttribute('style', 'position:fixed;right:14px;bottom:14px;z-index:2147483646;' +
-      'display:flex;align-items:center;gap:6px;background:rgba(15,17,21,.95);color:#e8e8ea;' +
-      'border:1px solid #3a3f4b;border-radius:999px;padding:7px 13px;cursor:pointer;user-select:none;' +
-      'font:13px system-ui;box-shadow:0 6px 20px rgba(0,0,0,.45)');
-    pill.innerHTML = '<span>🎁</span><span id="zcode-claim-pill-badge" style="font-weight:600;min-width:10px"></span>';
+      'display:flex;align-items:center;gap:7px;background:' + T.bg + ';color:' + T.text + ';' +
+      'border:1px solid ' + T.border + ';border-radius:999px;padding:8px 13px;cursor:pointer;user-select:none;' +
+      'font:13px ' + T.font + ';box-shadow:0 6px 20px rgba(0,0,0,.45)');
+    pill.innerHTML = '<span style="display:flex;color:' + T.text + '">' + icon('coin', 15) + '</span>' +
+      '<span id="zcode-claim-pill-badge" style="font-weight:600;min-width:10px;font-variant-numeric:tabular-nums"></span>' +
+      '<span id="zcode-claim-pill-dot" style="width:7px;height:7px;border-radius:50%;background:' + T.text3 + '"></span>';
     pill.title = 'ZCode promo tokens';
     pillBadge = pill.querySelector('#zcode-claim-pill-badge');
+    pillDot = pill.querySelector('#zcode-claim-pill-dot');
     pill.onclick = function () {
       if (panel && panel.style.display !== 'none') {
         panel.style.display = 'none';
@@ -769,29 +841,29 @@
     panel.id = 'zcode-claim-panel';
     panel.setAttribute('style', 'position:fixed;right:14px;bottom:56px;z-index:2147483646;display:none;' +
       'width:330px;max-width:calc(100vw - 28px);max-height:min(600px,75vh);overflow:auto;' +
-      'background:rgba(15,17,21,.97);color:#e8e8ea;border:1px solid #3a3f4b;border-radius:12px;' +
-      'padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.6);font:13px system-ui');
+      'background:' + T.bg + ';color:' + T.text + ';border:1px solid ' + T.border + ';border-radius:12px;' +
+      'padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.6);font:13px ' + T.font);
     panel.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
         '<div style="font-weight:600">Promo tokens</div>' +
-        '<div id="zcode-claim-close" style="cursor:pointer;opacity:.7;padding:0 4px">✕</div>' +
+        '<div id="zcode-claim-close" role="button" aria-label="Close" style="cursor:pointer;opacity:.7;padding:2px;display:flex">' + icon('close', 14) + '</div>' +
       '</div>' +
-      '<div id="zcode-claim-ui-status" style="margin-bottom:8px;color:#a7f3d0;word-break:break-word">checking…</div>' +
-      '<div id="zcode-claim-login-row" style="margin-bottom:8px">' +
-        '<button id="zcode-login-global" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px;cursor:pointer">Login (Global)</button>' +
-        '<button id="zcode-login-cn" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:7px 10px;cursor:pointer">Login (CN)</button>' +
+      '<div id="zcode-claim-ui-status" style="margin-bottom:8px;color:' + T.text2 + ';word-break:break-word">checking…</div>' +
+      '<div id="zcode-claim-login-row" style="margin-bottom:10px">' +
+        '<button id="zcode-login-global" style="display:inline-flex;align-items:center;gap:6px;background:' + T.accent + ';color:#fff;border:0;border-radius:8px;padding:7px 11px;margin-right:6px;cursor:pointer;font:12px ' + T.font + '">' + icon('arrow', 12) + '<span>Login · Global</span></button>' +
+        '<button id="zcode-login-cn" style="display:inline-flex;align-items:center;gap:6px;background:' + T.surface + ';color:' + T.text + ';border:1px solid ' + T.borderStrong + ';border-radius:8px;padding:7px 11px;cursor:pointer;font:12px ' + T.font + '">' + icon('arrow', 12) + '<span>Login · CN</span></button>' +
       '</div>' +
       '<div style="margin-bottom:10px">' +
-        '<button id="zcode-claim-now" style="background:#7c3aed;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px;cursor:pointer">Claim all</button>' +
-        '<button id="zcode-claim-refresh" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 10px;margin-right:6px;cursor:pointer">Refresh</button>' +
-        '<button id="zcode-claim-open" style="background:#3b3f4a;color:#fff;border:0;border-radius:8px;padding:7px 10px;cursor:pointer">Claim page</button>' +
+        '<button id="zcode-claim-now" style="display:inline-flex;align-items:center;gap:6px;background:' + T.accent + ';color:#fff;border:0;border-radius:8px;padding:7px 11px;margin-right:6px;cursor:pointer;font:12px ' + T.font + '">' + icon('zap', 12) + '<span>Claim all</span></button>' +
+        '<button id="zcode-claim-refresh" style="display:inline-flex;align-items:center;gap:6px;background:transparent;color:' + T.text2 + ';border:1px solid ' + T.border + ';border-radius:8px;padding:7px 11px;margin-right:6px;cursor:pointer;font:12px ' + T.font + '">' + icon('refresh', 12) + '<span>Refresh</span></button>' +
+        '<button id="zcode-claim-open" style="display:inline-flex;align-items:center;gap:6px;background:transparent;color:' + T.text2 + ';border:1px solid ' + T.border + ';border-radius:8px;padding:7px 11px;cursor:pointer;font:12px ' + T.font + '">' + icon('coin', 12) + '<span>Claim page</span></button>' +
       '</div>' +
-      '<div style="font-size:11px;opacity:.6;margin-bottom:4px">AVAILABLE</div>' +
+      '<div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:' + T.text3 + ';margin-bottom:4px">Available</div>' +
       '<div id="zcode-claim-available" style="margin-bottom:10px"></div>' +
-      '<div style="font-size:11px;opacity:.6;margin-bottom:4px">RECEIVED</div>' +
+      '<div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:' + T.text3 + ';margin-bottom:4px">Received</div>' +
       '<div id="zcode-claim-history" style="margin-bottom:8px"></div>' +
-      '<pre id="zcode-claim-ui-result" style="display:none;white-space:pre-wrap;word-break:break-all;max-height:140px;overflow:auto;background:#10131a;padding:8px;border-radius:8px;font-size:11px"></pre>' +
-      (DEBUG ? '<div id="zcode-claim-debug-link" style="cursor:pointer;color:#a5b4fc;font-size:11px;margin-top:6px">Open debug panel</div>' : '');
+      '<pre id="zcode-claim-ui-result" style="display:none;white-space:pre-wrap;word-break:break-all;max-height:140px;overflow:auto;background:' + T.surface + ';padding:8px;border-radius:8px;font-size:11px;font-family:' + T.mono + ';color:' + T.text2 + ';border:1px solid ' + T.border + '"></pre>' +
+      (DEBUG ? '<div id="zcode-claim-debug-link" style="cursor:pointer;color:' + T.accent + ';font-size:11px;margin-top:6px">Open debug panel</div>' : '');
     document.body.appendChild(panel);
     uiStatusEl = panel.querySelector('#zcode-claim-ui-status');
     uiLoginRow = panel.querySelector('#zcode-claim-login-row');
