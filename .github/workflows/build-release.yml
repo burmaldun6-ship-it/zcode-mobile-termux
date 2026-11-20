@@ -49,7 +49,7 @@ jobs:
 
       - name: Install upstream dependencies
         working-directory: upstream
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build upstream web + server + agent distribution
         working-directory: upstream
