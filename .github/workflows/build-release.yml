@@ -60,7 +60,11 @@ jobs:
         run: pnpm build:zcode --base-url https://github.com/${{ github.repository }}/releases/download/
 
       - name: Assemble Termux package
-        run: bash scripts/assemble-release.sh upstream/dist/zcode/.work/zcode dist-release
+        run: |
+          UPSTREAM_VERSION=$(node -p "require('./upstream/package.json').version")
+          mkdir -p unpacked
+          tar -xzf "upstream/dist/zcode/releases/${UPSTREAM_VERSION}/zcode-${UPSTREAM_VERSION}.tar.gz" -C unpacked
+          bash scripts/assemble-release.sh "unpacked/zcode" dist-release
 
       - name: Publish test release
         uses: softprops/action-gh-release@v2
