@@ -20,8 +20,17 @@ if patched != text:
     print("[OK] patched projectStorageHostId")
 
 text = web.read_text(encoding="utf-8")
+# Remove legacy external bridge references.
 text = re.sub(r'\s*<script src="/zcode-claim-bridge\.js"></script>\s*', '\n  ', text, count=1)
-text = re.sub(r'<script>[\s\S]*?zcode-claim-widget[\s\S]*?</script>\s*', '', text, count=1)
+# Remove a previously injected inline bridge. The tempered pattern only matches
+# inside ONE script block, so a re-run can never span across the app's own
+# module/inline scripts the way a plain [\s\S]*? scan would.
+text = re.sub(
+    r'\s*<script>(?:(?!</script>)[\s\S])*?zcode-claim-widget(?:(?!</script>)[\s\S])*?</script>\s*',
+    '\n  ',
+    text,
+    count=1,
+)
 if "</body>" in text:
     inline = "<script>\n" + bridge.read_text(encoding="utf-8") + "</script>\n  "
     text = text.replace("</body>", inline + "</body>", 1)
