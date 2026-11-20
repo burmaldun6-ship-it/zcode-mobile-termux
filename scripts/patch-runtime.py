@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import pathlib
 import re
-import shutil
 import sys
 
 root = pathlib.Path(sys.argv[1]).resolve()
@@ -21,12 +20,9 @@ if patched != text:
     print("[OK] patched projectStorageHostId")
 
 text = web.read_text(encoding="utf-8")
-if "zcode-claim-bridge.js" not in text and "</head>" in text:
-    text = text.replace("</head>", '<script src="/zcode-claim-bridge.js"></script>\n  </head>', 1)
+text = re.sub(r'\s*<script src="/zcode-claim-bridge\.js"></script>\s*', '\n  ', text, count=1)
+if "zcode-claim-widget" not in text and "</body>" in text:
+    inline = "<script>\n" + bridge.read_text(encoding="utf-8") + "</script>\n  "
+    text = text.replace("</body>", inline + "</body>", 1)
     web.write_text(text, encoding="utf-8")
-    print("[OK] injected claim bridge")
-
-target = root / "web" / "zcode-claim-bridge.js"
-if not target.exists() or target.read_bytes() != bridge.read_bytes():
-    shutil.copyfile(bridge, target)
-    print("[OK] installed claim bridge")
+    print("[OK] injected claim bridge widget")

@@ -12,7 +12,7 @@ access to the Termux filesystem and packages.
 - Shell: `SHELL`/`PATH` point to Termux, so agent Bash commands run via `/data/data/com.termux/files/usr/bin/bash -c -l`.
 - Giveaways: local claim page (see `claim/`), talks to the same ZCode endpoints as the desktop widget.
   The JWT is picked up automatically from the official web session — no manual copy/paste needed.
-  A small bridge injected into the web UI sends it from the browser to the local claim server.
+  A widget embedded in the web page shows detection status and sends the token to the local claim server.
 
 Real chat and claims require a ZCode/z.ai account. No credentials are bundled.
 
