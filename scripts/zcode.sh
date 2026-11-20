@@ -50,6 +50,39 @@ web_url() {
   echo "$url"
 }
 
+server_up() {
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:${PORT}/api/server-info" || true)"
+  case "$code" in
+    200|401) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+claim_up() {
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:${CLAIM_PORT}/claim/status" || true)"
+  [ "$code" = "200" ]
+}
+
+start_claim() {
+  if claim_up; then
+    return 0
+  fi
+  mkdir -p "$LOGS"
+  setsid nohup env HOME="$DATA" SHELL="$(command -v bash)" PATH="$PATH" \
+    ZCODE_DATA_BASE_DIR="$DATA/v2" ZCODE_CLAIM_TRACE="${ZCODE_CLAIM_TRACE:-1}" \
+    node "$ROOT/scripts/claim-mini-server.js" > "$LOGS/claim.log" 2>&1 &
+}
+
+print_status() {
+  echo "[*] ZCode Web UI: $(web_url)"
+  echo "[*] Giveaways:    http://127.0.0.1:${CLAIM_PORT}/claim"
+  echo "[*] Workspace:    ${DATA}/workspace"
+  echo "[*] Agent shell:  $(command -v bash)"
+  echo "[*] Log:          ${LOGS}/official-server.log"
+}
+
 open_url() {
   local url="$1"
   echo "$url"
@@ -131,6 +164,12 @@ case "$cmd" in
     ls -la "$LOGS" 2>/dev/null || echo "[zcode] no logs dir yet: $LOGS"
     ;;
   start)
+    if server_up; then
+      echo "[zcode] server already running on port ${PORT}"
+      start_claim
+      print_status
+      exit 0
+    fi
     if [ -f "$ROOT/scripts/termux-official.sh" ]; then
       bash "$ROOT/scripts/termux-official.sh"
     else
