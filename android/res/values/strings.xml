@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZCode Mobile</string>
+    <string name="notification_channel">ZCode backend</string>
+    <string name="backend_running">Backend is running</string>
+</resources>

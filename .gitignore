@@ -1,0 +1,11 @@
+node_modules/
+*.log
+*.pid
+.zcode-mobile/
+runtime-official/
+android/build/
+android/dist/
+builder/build/
+builder/dist/
+*.apk
+.DS_Store

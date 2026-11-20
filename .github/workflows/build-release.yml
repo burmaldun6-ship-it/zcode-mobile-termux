@@ -1,0 +1,74 @@
+name: Build test release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version"
+        required: false
+        default: "3.18.2-test"
+      zcode_ref:
+        description: "Upstream ZCode git ref"
+        required: false
+        default: "v3.18.2"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  ZCODE_REF: ${{ github.event.inputs.zcode_ref || 'v3.18.2' }}
+  RELEASE_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Checkout upstream ZCode
+        uses: actions/checkout@v4
+        with:
+          repository: zai-org/ZCode
+          ref: ${{ env.ZCODE_REF }}
+          path: upstream
+
+      - name: Install upstream dependencies
+        working-directory: upstream
+        run: pnpm install --frozen-lockfile
+
+      - name: Build upstream web + server + agent distribution
+        working-directory: upstream
+        run: pnpm build:zcode --base-url https://github.com/${{ github.repository }}/releases/download/
+
+      - name: Assemble Termux package
+        run: bash scripts/assemble-release.sh upstream/dist/zcode/.work/zcode dist-release
+
+      - name: Publish test release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: ZCode Mobile Termux — ${{ env.RELEASE_VERSION }} (test)
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            Test build assembled by GitHub Actions from upstream ZCode ${{ env.ZCODE_REF }}.
+            Contains the official web UI, HTTP/WS server and agent bundle.
+            Extract the tarball in Termux and run `bash install.sh`.
+            Apache-2.0 licensed (upstream ZCode copyright Z.AI Co., Ltd).
+            Not affiliated with Z.ai. Requires a ZCode/z.ai account for chat and claims.
+          files: dist-release/*.tar.gz
