@@ -30,11 +30,15 @@ const jwt=document.getElementById('jwt');
 function show(j){out.textContent=JSON.stringify(j,null,2)}
 async function api(p,o){const r=await fetch(p,Object.assign({headers:{'Content-Type':'application/json'}},o||{}));return r.json()}
 function setBadge(ok){badge.className='badge '+(ok?'ok':'wait');badge.textContent=ok?'JWT: obtained automatically from ZCode web session':'JWT: not yet — log in to ZCode in the other tab'}
-async function status(){const s=await api('/claim/status');setBadge(s.state.configured);show(s)}
+async function status(showResult){const s=await api('/claim/status');setBadge(s.state.configured);if(showResult!==false)show(s)}
 async function campaigns(){show(await api('/claim/campaigns'))}
 async function claimAll(){show(await api('/claim/claim-all',{method:'POST',body:'{}'}))}
 async function save(){const token=jwt.value.trim();if(!token)return;show(await api('/claim/start',{method:'POST',body:JSON.stringify({jwt:token})}));status()}
-setInterval(status,5000);status();
+function readSession(){try{var raw=localStorage.getItem('oauth:browser_session');if(raw){var s=JSON.parse(raw);if(s&&s.version===1&&typeof s.zcodeJwtToken==='string'&&s.zcodeJwtToken.trim())return{jwt:s.zcodeJwtToken.trim(),provider:s.provider||'',locale:document.documentElement.lang||''}}var legacy=localStorage.getItem('zcodejwttoken');if(legacy&&legacy.trim())return{jwt:legacy.trim(),provider:localStorage.getItem('oauth:active_provider')||'',locale:document.documentElement.lang||''}}catch(e){}return null}
+var autoTried='';
+async function autoToken(){var t=readSession();if(!t||t.jwt===autoTried)return;autoTried=t.jwt;try{var r=await api('/claim/auto-token',{method:'POST',body:JSON.stringify({jwt:t.jwt,provider:t.provider,locale:t.locale})});if(r&&r.ok)status(false)}catch(e){}}
+status();autoToken();
+setInterval(function(){autoToken();status(false)},5000);
 </script></body></html>`;
 
 function send(res, status, body) {

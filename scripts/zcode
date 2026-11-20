@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+DATA="${HOME}/.zcode-mobile"
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+PORT="${ZCODE_PORT:-3030}"
+CLAIM_PORT="${ZCODE_CLAIM_PORT:-45212}"
+PIDFILE="$DATA/zcode.pid"
+CLAIM_PIDFILE="$DATA/claim.pid"
+WSFILE="$DATA/zcode-workspace"
+
+CMD="${1:-}"
+shift || true
+
+WORKSPACE="${ZCODE_WORKSPACE:-$PWD}"
+if [ "$#" -gt 0 ] && [ -n "${1:-}" ]; then
+  WORKSPACE="$1"
+fi
+if [ -d "$WORKSPACE" ]; then
+  WORKSPACE=$(cd "$WORKSPACE" && pwd -P)
+fi
+
+usage() {
+  cat <<'EOF'
+usage: zcode <command> [workspace]
+
+commands:
+  start       start the agent in the current directory and open the UI
+  open        open the UI, starting the agent if needed
+  claim       start the claim service and open http://127.0.0.1:3030/claims
+  stop        stop the agent and the claim service
+  kill        same as stop
+  restart     restart the agent in the current directory
+  status      show agent, claim and workspace status
+  log         follow the agent log
+  claim-log   follow the claim log
+  help        show this help (also the default with no arguments)
+
+The workspace defaults to the current directory; pass a path to override it.
+
+examples:
+  zcode start
+  zcode claim
+  zcode start /storage/emulated/0/my-project
+EOF
+}
+
+case "$CMD" in
+  ""|help|-h|--help)
+    usage
+    exit 0
+    ;;
+  start|open|claim|stop|kill|restart|status|log|claim-log)
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+# Resolve the install root: env, state file written by install.sh, or default.
+APP="${ZCODE_APP:-}"
+if [ -z "$APP" ]; then
+  APP="$(cat "$DATA/app-root" 2>/dev/null || true)"
+fi
+if [ -z "$APP" ] || [ ! -d "$APP" ]; then
+  APP="$HOME/zcode-mobile-termux"
+fi
+if [ -f "$APP/start.sh" ]; then
+  LAUNCHER="$APP/start.sh"
+  SERVER_JS="$APP/server/entry-http.js"
+else
+  LAUNCHER="$APP/scripts/termux-official.sh"
+  SERVER_JS="$APP/dist/server/entry-http.js"
+fi
+CLAIM_JS="$APP/scripts/claim-mini-server.js"
+
+TOKEN_FILE="$DATA/web-token"
+TOKEN=$(cat "$TOKEN_FILE" 2>/dev/null || true)
+BASE_URL="http://127.0.0.1:${PORT}/?token=${TOKEN}&_=$(date +%s)"
+CLAIM_URL="http://127.0.0.1:${PORT}/claims"
+
+server_up() {
+  case "$(curl -sS --max-time 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/api/server-info" 2>/dev/null)" in
+    200|401) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+claim_up() {
+  curl -fsS --max-time 2 -o /dev/null "http://127.0.0.1:${CLAIM_PORT}/claim/status" 2>/dev/null
+}
+
+open_url() {
+  if command -v am >/dev/null 2>&1 && am start -a android.intent.action.VIEW -d "$1" >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v termux-open-url >/dev/null 2>&1 && termux-open-url "$1" >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+require_runtime() {
+  if [ ! -f "$SERVER_JS" ]; then
+    printf '[ERROR] runtime not found: %s\n' "$SERVER_JS" >&2
+    printf '        run install.sh first, or set ZCODE_APP=<install dir>\n' >&2
+    return 1
+  fi
+  mkdir -p "$DATA/logs"
+}
+
+stop_agent() {
+  if [ -f "$PIDFILE" ]; then
+    pid=$(cat "$PIDFILE" 2>/dev/null || true)
+    if [ -n "$pid" ] && [ -r "/proc/$pid/cmdline" ] && tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq -- "$SERVER_JS"; then
+      kill "$pid" 2>/dev/null || true
+    fi
+    rm -f "$PIDFILE"
+  fi
+  for pid in $(pgrep -f -- "$SERVER_JS" 2>/dev/null); do
+    [ "$pid" = "$$" ] && continue
+    kill "$pid" 2>/dev/null || true
+  done
+  rm -f "$WSFILE"
+}
+
+stop_claim() {
+  if [ -f "$CLAIM_PIDFILE" ]; then
+    pid=$(cat "$CLAIM_PIDFILE" 2>/dev/null || true)
+    if [ -n "$pid" ] && [ -r "/proc/$pid/cmdline" ] && tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq -- "$CLAIM_JS"; then
+      kill "$pid" 2>/dev/null || true
+    fi
+    rm -f "$CLAIM_PIDFILE"
+  fi
+  for pid in $(pgrep -f -- "$CLAIM_JS" 2>/dev/null); do
+    [ "$pid" = "$$" ] && continue
+    kill "$pid" 2>/dev/null || true
+  done
+}
+
+start_agent() {
+  require_runtime || return 1
+  if server_up; then
+    running=$(cat "$WSFILE" 2>/dev/null || true)
+    if [ -n "$running" ] && [ "$running" != "$WORKSPACE" ]; then
+      printf '[*] switching workspace: %s -> %s\n' "$running" "$WORKSPACE"
+      stop_agent
+      sleep 1
+    else
+      return 0
+    fi
+  fi
+  setsid nohup bash "$LAUNCHER" "$WORKSPACE" > "$DATA/logs/official-server.log" 2>&1 &
+  printf '%s\n' "$!" > "$PIDFILE"
+  printf '%s\n' "$WORKSPACE" > "$WSFILE"
+  i=0
+  while [ "$i" -lt 60 ]; do
+    server_up && return 0
+    sleep 0.5
+    i=$((i + 1))
+  done
+  printf '[ERROR] server did not start; see %s\n' "$DATA/logs/official-server.log" >&2
+  return 1
+}
+
+start_claim() {
+  require_runtime || return 1
+  if [ ! -f "$CLAIM_JS" ]; then
+    printf '[ERROR] claim service not found: %s\n' "$CLAIM_JS" >&2
+    return 1
+  fi
+  if claim_up; then
+    return 0
+  fi
+  setsid nohup env HOME="$DATA" \
+    CLAIM_PORT="$CLAIM_PORT" \
+    ZCODE_DATA_BASE_DIR="$DATA/v2" \
+    ZCODE_CLAIM_TRACE="${ZCODE_CLAIM_TRACE:-1}" \
+    NODE_EXTRA_CA_CERTS="$PREFIX/etc/tls/cert.pem" \
+    node "$CLAIM_JS" > "$DATA/logs/claim.log" 2>&1 &
+  printf '%s\n' "$!" > "$CLAIM_PIDFILE"
+  i=0
+  while [ "$i" -lt 60 ]; do
+    claim_up && return 0
+    sleep 0.25
+    i=$((i + 1))
+  done
+  printf '[ERROR] claim server did not start; see %s\n' "$DATA/logs/claim.log" >&2
+  return 1
+}
+
+show_status() {
+  if server_up; then
+    printf '[OK] agent: %s\n' "$BASE_URL"
+  else
+    printf '[DOWN] agent\n'
+  fi
+  ws=$(cat "$WSFILE" 2>/dev/null || true)
+  [ -n "$ws" ] && printf '[*] workspace: %s\n' "$ws"
+  if claim_up; then
+    printf '[OK] claim: %s\n' "$CLAIM_URL"
+  else
+    printf '[DOWN] claim\n'
+  fi
+}
+
+case "$CMD" in
+  start)
+    start_agent || exit 1
+    printf '[*] Workspace: %s\n' "$WORKSPACE"
+    printf '[*] UI: %s\n' "$BASE_URL"
+    if [ "${ZCODE_NO_OPEN:-0}" != 1 ]; then
+      open_url "$BASE_URL" || printf '[!] Open manually: %s\n' "$BASE_URL"
+    fi
+    ;;
+  open)
+    start_agent || exit 1
+    open_url "$BASE_URL" || printf '[!] Open manually: %s\n' "$BASE_URL"
+    ;;
+  claim)
+    start_agent || exit 1
+    start_claim || exit 1
+    printf '[*] Claim: %s\n' "$CLAIM_URL"
+    if [ "${ZCODE_NO_OPEN:-0}" != 1 ]; then
+      open_url "$CLAIM_URL" || printf '[!] Open manually: %s\n' "$CLAIM_URL"
+    fi
+    ;;
+  stop|kill)
+    stop_claim
+    stop_agent
+    printf '[OK] stopped\n'
+    ;;
+  restart)
+    stop_agent
+    sleep 1
+    start_agent || exit 1
+    printf '[*] Workspace: %s\n' "$WORKSPACE"
+    printf '[*] UI: %s\n' "$BASE_URL"
+    if [ "${ZCODE_NO_OPEN:-0}" != 1 ]; then
+      open_url "$BASE_URL" || printf '[!] Open manually: %s\n' "$BASE_URL"
+    fi
+    ;;
+  status)
+    show_status
+    ;;
+  log)
+    mkdir -p "$DATA/logs"
+    tail -f "$DATA/logs/official-server.log"
+    ;;
+  claim-log)
+    mkdir -p "$DATA/logs"
+    tail -f "$DATA/logs/claim.log"
+    ;;
+esac

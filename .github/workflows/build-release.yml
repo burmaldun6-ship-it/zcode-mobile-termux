@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 24.14.0
 
+      - name: Run claim tests
+        run: node claim/test-claim.js
+
       - name: Checkout upstream ZCode
         uses: actions/checkout@v6
         with:

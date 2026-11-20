@@ -10,10 +10,10 @@ access to the Termux filesystem and packages.
 - Server: official `@zcode/server` (`entry-http.js`), token-protected HTTP + `/ws`.
 - Agent: official `zcode.cjs` agent bundle, spawned with `app-server --stdio`.
 - Shell: `SHELL`/`PATH` point to Termux, so agent Bash commands run via `/data/data/com.termux/files/usr/bin/bash -c -l`.
-- Giveaways: local claim page (see `claim/`), talks to the same ZCode endpoints as the desktop widget.
-  A widget embedded in the web page performs the official OAuth CLI-poll login, obtains the JWT
-  (`data.token`) and sends it to the local claim server — no manual copy/paste needed.
-  Claims are gated behind the official Aliyun CAPTCHA SDK solved interactively by the user.
+- Giveaways: local claim page (see `claim/`), served by the main server at
+  `http://127.0.0.1:3030/claims` (`zcode claim`). It auto-detects the JWT from the
+  logged-in web session (same origin — no copy/paste). Claims are gated behind the
+  official Aliyun CAPTCHA SDK solved interactively by the user.
 
 Real chat and claims require a ZCode/z.ai account. No credentials are bundled.
 
@@ -31,7 +31,8 @@ curl -fsSL https://raw.githubusercontent.com/burmaldun6-ship-it/zcode-mobile-ter
 ```
 
 The installer downloads the latest public release tarball via the GitHub API,
-extracts it to `~/zcode-mobile-termux` and runs `install.sh` for you.
+extracts it to `~/zcode-mobile-termux`, runs `install.sh` for you and installs the
+`zcode` command. Then run `zcode start` from the folder the agent should work in.
 
 Or manually:
 
@@ -41,40 +42,30 @@ Or manually:
    mkdir -p ~/zcode-mobile && tar -xzf zcode-mobile-termux-*.tar.gz -C ~/zcode-mobile --strip-components=1
    cd ~/zcode-mobile
    bash install.sh
-   bash scripts/termux-official.sh
+   cd ~/your-project        # the folder the agent should work in
+   zcode start
    ```
 
 Open the printed URL, e.g. `http://127.0.0.1:3030/?token=<token>`.
 From another device on the same Wi-Fi use the printed LAN URL.
 
-In the centre widget, press **Login (Global)** (or **Login (CN)**) and finish the popup
-login. The widget stores the JWT and forwards it to the claim server automatically.
-Then press **Claim all**: if the campaign requires verification, the official Aliyun
-CAPTCHA window opens — solve it yourself; no claim is sent before that. The standalone
-giveaway page is at `http://127.0.0.1:45212/claim` (or `zcode claim`).
+Log in to ZCode in the UI first. Then run `zcode claim`: it starts the claim service
+and opens `http://127.0.0.1:3030/claims`, which picks up the JWT from the same browser
+session automatically (or paste it manually under "Manual JWT"). Press **Claim all**:
+if the campaign requires verification, the official Aliyun CAPTCHA window opens — solve
+it yourself; no claim is sent before that.
 
-Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
+Stop with `zcode stop`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 
-### Verbose logs
+### Logs
 
 Logs are written to `~/.zcode-mobile/logs/`:
 
 - `official-server.log` — web server and agent (`zcode log`)
-- `claim.log` — local claim mini server (`zcode log-claim`)
-- `zcode-browser.log` — widget events, written only in debug mode (`zcode log-browser`)
+- `claim.log` — local claim mini server (`zcode claim-log`)
 - `claim-trace.log` — every upstream claim/touch/config HTTP request and response, with
-  redacted JWT/captcha values (`zcode log-trace`). Enabled by default in the launcher;
-  set `ZCODE_CLAIM_TRACE=0` to disable.
-
-All four logs can be followed with `zcode log-all`. To enable browser-side debug logging:
-
-```bash
-ZCODE_CLAIM_DEBUG=1 zcode open
-```
-
-This adds `zcodeDebug=1` to the URL and remembers it in `localStorage`. Open with
-`zcodeDebug=0` to disable. The browser log contains timestamps, OAuth status, captcha
-config/result and claim responses; JWT values are only recorded as a 12-character prefix.
+  redacted JWT/captcha values (`tail -f ~/.zcode-mobile/logs/claim-trace.log`).
+  Enabled by default (`ZCODE_CLAIM_TRACE=1`); set `ZCODE_CLAIM_TRACE=0` to disable.
 
 ## Layout
 
@@ -82,15 +73,14 @@ config/result and claim responses; JWT values are only recorded as a 12-characte
 - `dist/server/` — official HTTP/WS server (provided by the release tarball)
 - `dist/agent/zcode.cjs` — official agent bundle (provided by the release tarball)
 - `dist/node_modules/` — runtime dependencies (provided by the release tarball)
-- `scripts/termux-official.sh` — main launcher (web UI + agent + claim page)
+- `scripts/zcode` — the `zcode` CLI wrapper (installed to `$PREFIX/bin/zcode`)
+- `scripts/termux-official.sh` — workspace-aware launcher used by the wrapper
 - `scripts/termux-client.sh` — legacy Electron-bundle backend bridge (experimental; requires extracted AppImage assets)
-- `scripts/claim-mini-server.js` — local giveaway/claim HTTP page
-- `scripts/zcode-claim-bridge.js` — injected into the web UI to forward the logged-in JWT locally
+- `scripts/claim-mini-server.js` — local giveaway/claim HTTP page (auto-detects the JWT)
 - `scripts/patch-runtime.py` — applies the server/web patches to a built release
-- `claim/` — claim/OAuth/marketing API implementation and tests
+- `claim/` — claim/OAuth/marketing API implementation and tests (`node claim/test-claim.js`, 16/16 mocked)
 - `backend/`, `web/` — Node bootstrap and WebView shim for the legacy APK build
 - `android/`, `builder/` — sources of the (experimental) Android APK build
-- `tests/` — claim tests (`node tests/test-claim.js`, 16/16 mocked)
 
 ## Building from source
 
@@ -113,7 +103,8 @@ bash ../scripts/assemble-release.sh unpacked/zcode ../dist-release
 ```
 
 `assemble-release.sh` also runs `scripts/patch-runtime.py`, which forces the
-standalone server to treat projects as local and injects the JWT bridge.
+standalone server to treat projects as local, injects the `/claims` reverse proxy
+to the local claim service, and adds the startup-screen fallback to `web/index.html`.
 
 On Bionic/Termux, Vite/Rolldown native bindings may require building on a glibc host.
 

@@ -9,3 +9,18 @@ builder/build/
 builder/dist/
 *.apk
 .DS_Store
+
+# release / CI artifacts (created by workflows and local assembly)
+dist/
+dist-release/
+unpacked/
+upstream/
+*.tar.gz
+*.tgz
+
+# python
+__pycache__/
+*.pyc
+
+# debug
+chrome-debug/

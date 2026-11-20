@@ -208,8 +208,8 @@ records method, URL, redacted headers, truncated body, status, duration and JSON
 `claimAll()` additionally records touch deliveries, extracted actions, captcha config, claim
 result codes and final counters. JWT and captcha values are never written in full.
 
-The launcher sets `ZCODE_CLAIM_TRACE=1`; set it to `0` to disable. View with `zcode log-trace`
-or include it in `zcode log-all`.
+The wrapper sets `ZCODE_CLAIM_TRACE=1`; set it to `0` to disable. View with
+`tail -f ~/.zcode-mobile/logs/claim-trace.log`.
 
 ## Anti-abuse notes
 

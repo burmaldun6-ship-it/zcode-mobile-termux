@@ -43,4 +43,5 @@ bash "$DEST/install.sh"
 
 echo
 echo "[OK] installed to ${DEST}"
-echo "Start: bash ${DEST}/scripts/termux-official.sh"
+echo "Start: zcode start   (from the folder the agent should work in)"
+echo "Claim: zcode claim   -> http://127.0.0.1:3030/claims"

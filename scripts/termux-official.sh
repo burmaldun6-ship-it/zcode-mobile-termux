@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Official ZCode web UI + agent on Termux, with Termux bash as the agent shell.
+# Official ZCode web UI + agent on Termux, workspace-aware launcher.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -10,7 +10,14 @@ PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 PORT="${ZCODE_PORT:-3030}"
 HOST="${ZCODE_HOST:-0.0.0.0}"
 
-mkdir -p "$DATA/workspace" "$DATA/logs"
+WORKSPACE="${ZCODE_WORKSPACE:-${1:-$PWD}}"
+if [ ! -d "$WORKSPACE" ]; then
+  echo "[ERROR] workspace is not a directory: $WORKSPACE" >&2
+  exit 1
+fi
+WORKSPACE=$(cd "$WORKSPACE" && pwd -P)
+
+mkdir -p "$DATA/logs"
 
 SECRET_FILE="$DATA/credential.secret"
 if [ ! -s "$SECRET_FILE" ]; then
@@ -37,7 +44,7 @@ export TMPDIR="${TMPDIR:-$DATA/logs}"
 export ZCODE_DATA_BASE_DIR="$DATA/v2"
 export ZCODE_APP_VERSION="3.18.2"
 export ZCODE_HOME="$DATA"
-export ZCODE_WORKSPACE="$DATA/workspace"
+export ZCODE_WORKSPACE="$WORKSPACE"
 export ZCODE_CREDENTIAL_SECRET="$SECRET"
 export ZCODE_BUILTIN_PROVIDER_CONFIG_FILE="$ROOT/agent/provider/zcode-builtin.json"
 export ZCODE_AGENT_SERVER_COMMAND="$(command -v node)"
@@ -46,26 +53,13 @@ export ZCODE_AGENT_CA_CERT="$PREFIX/etc/tls/cert.pem"
 export NODE_EXTRA_CA_CERTS="$PREFIX/etc/tls/cert.pem"
 export PORT="$PORT"
 export ZCODE_SERVER_HOST="$HOST"
-export ZCODE_SERVER_WORKSPACE="$DATA/workspace"
+export ZCODE_SERVER_WORKSPACE="$WORKSPACE"
 export ZCODE_WEB_STATIC_ROOT="$ROOT/web"
 export ZCODE_SERVER_AUTH_TOKEN="$TOKEN"
 
-CLAIM_PORT="${ZCODE_CLAIM_PORT:-45212}"
-if ! curl -s --max-time 1 "http://127.0.0.1:${CLAIM_PORT}/claim" >/dev/null 2>&1; then
-  setsid nohup env HOME="$DATA" SHELL="$SHELL" PATH="$PATH" \
-    ZCODE_CLAIM_TRACE="${ZCODE_CLAIM_TRACE:-1}" node \
-    "$PROJECT/scripts/claim-mini-server.js" > "$DATA/logs/claim.log" 2>&1 &
-fi
-
-IP=$(ip -4 addr 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1)
-
 echo "[*] ZCode Web UI: http://127.0.0.1:${PORT}/?token=${TOKEN}"
-echo "[*] Giveaways:    http://127.0.0.1:${CLAIM_PORT}/claim"
-[ -n "$IP" ] && echo "[*] LAN:          http://${IP}:${PORT}/?token=${TOKEN}"
-echo "[*] Workspace:    $DATA/workspace"
+echo "[*] Workspace:    $WORKSPACE"
 echo "[*] Agent shell:  $SHELL"
-echo "[*] Log:          $DATA/logs/official-server.log"
-echo "[*] Stop:         Ctrl+C"
 
-cd "$DATA/workspace" || exit 1
+cd "$WORKSPACE" || exit 1
 exec node "$ROOT/server/entry-http.js"
