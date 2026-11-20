@@ -62,8 +62,11 @@ Logs are written to `~/.zcode-mobile/logs/`:
 - `official-server.log` — web server and agent (`zcode log`)
 - `claim.log` — local claim mini server (`zcode log-claim`)
 - `zcode-browser.log` — widget events, written only in debug mode (`zcode log-browser`)
+- `claim-trace.log` — every upstream claim/touch/config HTTP request and response, with
+  redacted JWT/captcha values (`zcode log-trace`). Enabled by default in the launcher;
+  set `ZCODE_CLAIM_TRACE=0` to disable.
 
-All three can be followed with `zcode log-all`. To enable browser-side debug logging:
+All four logs can be followed with `zcode log-all`. To enable browser-side debug logging:
 
 ```bash
 ZCODE_CLAIM_DEBUG=1 zcode open

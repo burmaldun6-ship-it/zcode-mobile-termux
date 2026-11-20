@@ -52,7 +52,8 @@ export ZCODE_SERVER_AUTH_TOKEN="$TOKEN"
 
 CLAIM_PORT="${ZCODE_CLAIM_PORT:-45212}"
 if ! curl -s --max-time 1 "http://127.0.0.1:${CLAIM_PORT}/claim" >/dev/null 2>&1; then
-  setsid nohup env HOME="$DATA" SHELL="$SHELL" PATH="$PATH" node \
+  setsid nohup env HOME="$DATA" SHELL="$SHELL" PATH="$PATH" \
+    ZCODE_CLAIM_TRACE="${ZCODE_CLAIM_TRACE:-1}" node \
     "$PROJECT/scripts/claim-mini-server.js" > "$DATA/logs/claim.log" 2>&1 &
 fi
 

@@ -200,6 +200,17 @@ curl -s -X POST http://127.0.0.1:45210/claim/oauth-callback \
   -d '{"url":"zcode://oauth/callback?code=CODE&state=STATE"}'
 ```
 
+## Request tracing
+
+`claim.js` writes newline-delimited JSON traces to `~/.zcode-mobile/logs/claim-trace.log`
+(or `<ZCODE_DATA_BASE_DIR>/../logs/claim-trace.log` when overridden). Every upstream call
+records method, URL, redacted headers, truncated body, status, duration and JSON response;
+`claimAll()` additionally records touch deliveries, extracted actions, captcha config, claim
+result codes and final counters. JWT and captcha values are never written in full.
+
+The launcher sets `ZCODE_CLAIM_TRACE=1`; set it to `0` to disable. View with `zcode log-trace`
+or include it in `zcode log-all`.
+
 ## Anti-abuse notes
 
 Persist a **stable** device UUID (never regenerate per run), send a monotonically increasing

@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { exchangeCodeForToken, DEFAULT_REDIRECT_URI } = require('./oauth-helper');
 
 const BASE_URL = 'https://zcode.z.ai';
@@ -48,6 +51,40 @@ function toErrorInfo(err, stage = 'request') {
       retryAfter: err.retryAfter ?? null,
     };
 
+}
+
+function clip(value, max = 4000) {
+  if (value === undefined || value === null) return value;
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  return text.length <= max ? text : text.slice(0, max) + '…[truncated]';
+}
+
+function traceFile() {
+  const configured = process.env.ZCODE_DATA_BASE_DIR;
+  const statePath = configured && path.extname(configured).toLowerCase() === '.json'
+    ? configured
+    : path.join(configured || path.join(os.homedir(), '.zcode', 'v2'), 'claim-state.json');
+  return path.join(path.dirname(statePath), '..', 'logs', 'claim-trace.log');
+}
+
+function trace(event, data) {
+  if (process.env.ZCODE_CLAIM_TRACE === '0') return;
+  try {
+    const file = traceFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, JSON.stringify({ ts: new Date().toISOString(), event, ...data }) + '\n');
+  } catch (err) {}
+}
+
+function redactHeaders(headers) {
+  const copy = { ...headers };
+  if (copy.Authorization) copy.Authorization = 'Bearer <redacted>';
+  for (const key of Object.keys(copy)) {
+    if (/captcha/i.test(key) && typeof copy[key] === 'string' && copy[key].length > 16) {
+      copy[key] = copy[key].slice(0, 16) + '…';
+    }
+  }
+  return copy;
 }
 
 function buildHeaders({
@@ -104,6 +141,8 @@ async function requestJson({
     hasBody: body !== undefined,
     extra: extraHeaders,
   });
+  const startedAt = Date.now();
+  trace('http_request', { method, url, headers: redactHeaders(headers), body: body ? clip(body) : null });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
@@ -119,6 +158,7 @@ async function requestJson({
     try {
       json = text ? JSON.parse(text) : {};
     } catch (err) {
+      trace('http_nonjson', { method, url, status: response.status, durationMs: Date.now() - startedAt, text: clip(text) });
       throw new ZCodeError('non-JSON response from ' + path, {
         name: 'ParseError',
         httpStatus: response.status,
@@ -126,6 +166,13 @@ async function requestJson({
         cause: err,
       });
     }
+    trace('http_response', {
+      method,
+      url,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+      response: clip(json),
+    });
     if (!response.ok) {
       throw new ZCodeError('HTTP ' + response.status + ' from ' + path, {
         name: 'HttpError',
@@ -144,6 +191,12 @@ async function requestJson({
     }
     return json;
   } catch (err) {
+    trace('http_error', {
+      method,
+      url,
+      durationMs: Date.now() - startedAt,
+      error: toErrorInfo(err, path),
+    });
     if (err instanceof ZCodeError) throw err;
     const aborted = controller.signal.aborted;
     throw new ZCodeError(
@@ -431,6 +484,7 @@ async function claimAll({
     failedCount: 0,
     errors: [],
   };
+  trace('claim_all_start', { seq, platform, locale, deviceMid });
 
   let touch;
   try {
@@ -440,6 +494,11 @@ async function claimAll({
       language: touch.language,
       deliveryCount: touch.deliveries.length,
     };
+    trace('claim_all_touch', {
+      seq,
+      deliveryCount: touch.deliveries.length,
+      deliveries: clip(touch.deliveries),
+    });
   } catch (err) {
     result.errors.push(toErrorInfo(err, 'marketing-touch'));
     return result;
@@ -447,6 +506,7 @@ async function claimAll({
 
   const actions = extractClaimActions(touch.deliveries);
   result.actions = actions.map((action) => ({ ...action, status: 'pending' }));
+  trace('claim_all_actions', { count: actions.length, actions });
   if (!actions.length) {
     result.ok = true;
     result.verification = {
@@ -464,6 +524,7 @@ async function claimAll({
     captchaConfig = await getCaptchaConfig({ jwt, platform, fetchImpl });
     result.captcha.enabled = captchaConfig.enabled;
     result.captcha.config = captchaConfig.config;
+    trace('claim_all_captcha', { enabled: captchaConfig.enabled, config: captchaConfig.config });
   } catch (err) {
     result.errors.push(toErrorInfo(err, 'captcha-config'));
   }
@@ -526,6 +587,13 @@ async function claimAll({
         terminal: claim.terminal,
         message: claim.message,
       };
+      trace('claim_result', {
+        planId: action.planId,
+        campaignId: action.campaignId,
+        code: claim.code,
+        success: claim.success,
+        message: claim.message,
+      });
       if (!claim.success) {
         action.status = claim.terminal ? 'claim_failed_terminal' : 'claim_failed';
         continue;
@@ -564,6 +632,12 @@ async function claimAll({
   result.claimedCount = result.actions.filter((action) => action.claim && action.claim.success).length;
   result.failedCount = result.actions.length - result.claimedCount;
   result.ok = result.claimedCount === result.actions.length && result.errors.length === 0;
+  trace('claim_all_finish', {
+    ok: result.ok,
+    claimedCount: result.claimedCount,
+    failedCount: result.failedCount,
+    errors: result.errors,
+  });
   return result;
 }
 
