@@ -10,6 +10,7 @@
   var captchaBusy = false;
   var seen = null;
   var autoClaimed = false;
+  var autoClaimPending = false;
   var panel = null;
   var statusEl = null;
   var keysEl = null;
@@ -278,6 +279,7 @@
       localStorage.setItem('zcodejwttoken', jwt);
       localStorage.setItem('oauth:active_provider', provider);
     } catch (e) {}
+    autoClaimPending = true;
     window.dispatchEvent(new Event('zcode-browser-auth-change'));
   }
 
@@ -379,7 +381,8 @@
       if (response.ok) {
         seen = found.jwt;
         render(found, 'sent to claim server');
-        if (!autoClaimed) {
+        if (autoClaimPending && !autoClaimed) {
+          autoClaimPending = false;
           autoClaimed = true;
           runClaimWithCaptcha();
         }

@@ -25,6 +25,7 @@ class ZCodeError extends Error {
     this.httpStatus = info.httpStatus ?? null;
     this.response = info.response ?? null;
     this.cause = info.cause ?? null;
+    this.retryAfter = info.retryAfter ?? null;
   }
 }
 
@@ -43,8 +44,10 @@ function toErrorInfo(err, stage = 'request') {
     name: err.name || 'Error',
     message: err.message || String(err),
     code: err.code ?? null,
-    httpStatus: err.httpStatus ?? null,
-  };
+      httpStatus: err.httpStatus ?? null,
+      retryAfter: err.retryAfter ?? null,
+    };
+
 }
 
 function buildHeaders({
@@ -129,6 +132,9 @@ async function requestJson({
         httpStatus: response.status,
         code: normalizeCode(json && json.code),
         response: json,
+        retryAfter: response.headers && typeof response.headers.get === 'function'
+          ? response.headers.get('retry-after') || null
+          : null,
       });
     }
     if (json && typeof json === 'object' && !Array.isArray(json)) {
@@ -443,11 +449,13 @@ async function claimAll({
   result.actions = actions.map((action) => ({ ...action, status: 'pending' }));
   if (!actions.length) {
     result.ok = true;
-    try {
-      result.verification = await verifyClaim({ jwt, deviceMid, platform, locale, seq, fetchImpl });
-    } catch (err) {
-      result.errors.push(toErrorInfo(err, 'verify'));
-    }
+    result.verification = {
+      verified: true,
+      remainingClaimActions: [],
+      plans: [],
+      skipped: true,
+      reason: 'no claim actions in marketing touch; skipped verification to avoid rate limits',
+    };
     return result;
   }
 
