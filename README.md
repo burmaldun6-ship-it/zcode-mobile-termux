@@ -63,7 +63,7 @@ buttons and **Claim all**), the history of successfully received tokens
 `✅ Token claimed: …` toast and are appended to `claims.log`. The old debug panel
 (localStorage dump, raw responses) is still available with `zcodeDebug=1`.
 
-Stop with `Ctrl+C`. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
+Use `zcode stop` (or `zcode kill`) to stop the server, claim server and agent, and `zcode restart` to bring them back in the background. The web token and credential secret are generated once and stored in `~/.zcode-mobile/`.
 
 ### zcode CLI
 
@@ -71,7 +71,8 @@ Stop with `Ctrl+C`. The web token and credential secret are generated once and s
 `~/.local/bin`), with `zcode-promo` kept as a compatibility alias:
 `zcode open|claim|status|tokens` open pages and print claim state, and
 `zcode log|log-claim|log-claims|log-browser|log-trace|log-all|logs` tail the logs
-below (add `-f` to follow), `zcode start` launches everything.
+below (add `-f` to follow), `zcode start` launches everything, `zcode stop|kill`
+stops it, and `zcode restart` restarts it in the background.
 
 ### Verbose logs
 

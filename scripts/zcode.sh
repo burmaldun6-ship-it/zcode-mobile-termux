@@ -36,6 +36,8 @@ Logs (in ~/.zcode-mobile/logs):
 
 Lifecycle:
   start           launch the web UI + agent + claim server
+  stop|kill       stop the web UI, claim server and spawned agent
+  restart         stop, then start everything in the background
   help            this text
 EOF
 }
@@ -73,6 +75,7 @@ start_claim() {
   setsid nohup env HOME="$DATA" SHELL="$(command -v bash)" PATH="$PATH" \
     ZCODE_DATA_BASE_DIR="$DATA/v2" ZCODE_CLAIM_TRACE="${ZCODE_CLAIM_TRACE:-1}" \
     node "$ROOT/scripts/claim-mini-server.js" > "$LOGS/claim.log" 2>&1 &
+  echo $! > "$DATA/claim.pid"
 }
 
 print_status() {
@@ -81,6 +84,74 @@ print_status() {
   echo "[*] Workspace:    ${DATA}/workspace"
   echo "[*] Agent shell:  $(command -v bash)"
   echo "[*] Log:          ${LOGS}/official-server.log"
+}
+
+pid_matches() {
+  local pid="$1" needle="$2"
+  [ -r "/proc/$pid/cmdline" ] || return 1
+  tr '\0' ' ' < "/proc/$pid/cmdline" | grep -Fq -- "$needle"
+}
+
+stop_process() {
+  local prefilter="$1" rootneedle="$2" fileneedle="$3" pidfile="$4"
+  local pid pids=""
+  pids="$(pgrep -f "$prefilter" 2>/dev/null || true)"
+  if [ -f "$DATA/$pidfile" ]; then
+    pid="$(cat "$DATA/$pidfile" 2>/dev/null || true)"
+    if [ -n "$pid" ]; then
+      pids="$pids
+$pid"
+    fi
+  fi
+  [ -z "$pids" ] && return 0
+  for pid in $pids; do
+    [ "$pid" = "$$" ] && continue
+    [ "$pid" = "$PPID" ] && continue
+    if pid_matches "$pid" "$rootneedle" && pid_matches "$pid" "$fileneedle"; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  done
+  rm -f "$DATA/$pidfile"
+}
+
+stop_all() {
+  echo "[zcode] stopping ZCode services…"
+  stop_process "zcode.cjs" "$ROOT/" "zcode.cjs" agent.pid
+  stop_process "claim-mini-server.js" "$ROOT/" "claim-mini-server.js" claim.pid
+  stop_process "entry-http.js" "$ROOT/" "entry-http.js" official.pid
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    if ! server_up && ! claim_up; then
+      break
+    fi
+    sleep 0.3
+  done
+  if server_up || claim_up; then
+    for i in 1 2 3 4 5; do
+      stop_process "claim-mini-server.js" "$ROOT/" "claim-mini-server.js" claim.pid
+      stop_process "entry-http.js" "$ROOT/" "entry-http.js" official.pid
+      sleep 0.4
+    done
+  fi
+  if server_up; then echo "[zcode] server still up on port ${PORT}"; else echo "[zcode] server stopped"; fi
+  if claim_up; then echo "[zcode] claim server still up on port ${CLAIM_PORT}"; else echo "[zcode] claim server stopped"; fi
+}
+
+start_background() {
+  mkdir -p "$LOGS"
+  setsid nohup bash "$ROOT/scripts/termux-official.sh" > "$LOGS/official-server.log" 2>&1 &
+  echo $! > "$DATA/official.pid"
+  local i
+  for i in $(seq 1 40); do
+    if server_up; then
+      start_claim
+      print_status
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "[zcode] server did not become ready; see ${LOGS}/official-server.log" >&2
+  return 1
 }
 
 open_url() {
@@ -177,6 +248,17 @@ case "$cmd" in
       echo "       start it from the install directory: bash scripts/termux-official.sh" >&2
       exit 1
     fi
+    ;;
+  stop|kill)
+    stop_all
+    ;;
+  restart)
+    stop_all
+    if server_up; then
+      echo "[zcode] server still up; refusing to start a second one" >&2
+      exit 1
+    fi
+    start_background
     ;;
   help|-h|--help)
     usage
