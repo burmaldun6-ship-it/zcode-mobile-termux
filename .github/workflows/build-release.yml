@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -36,12 +36,12 @@ jobs:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.14.0
 
       - name: Checkout upstream ZCode
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: zai-org/ZCode
           ref: ${{ env.ZCODE_REF }}
