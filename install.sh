@@ -27,6 +27,29 @@ mkdir -p "$DATA/logs"
 # remember the install root for the zcode wrapper
 printf '%s\n' "$ROOT" > "$DATA/app-root"
 
+add_path_entry() {
+  dir="$1"
+  added=0
+  for rc in "$HOME/.bashrc" "$HOME/.profile"; do
+    [ -f "$rc" ] || continue
+    if grep -Fq "# >>> zcode PATH >>>" "$rc"; then
+      added=1
+      continue
+    fi
+    {
+      printf '\n# >>> zcode PATH >>>\n'
+      printf 'export PATH="%s:$PATH"\n' "$dir"
+      printf '# <<< zcode PATH <<<\n'
+    } >> "$rc"
+    echo "[*] added ${dir} to PATH in ${rc}"
+    added=1
+  done
+  if [ "$added" -eq 0 ]; then
+    printf '# >>> zcode PATH >>>\nexport PATH="%s:$PATH"\n# <<< zcode PATH <<<\n' "$dir" >> "$HOME/.bashrc"
+    echo "[*] added ${dir} to PATH in ${HOME}/.bashrc"
+  fi
+}
+
 # install the zcode CLI
 ZCODE_BIN="$PREFIX/bin/zcode"
 if ! install -m 700 "$ROOT/scripts/zcode" "$ZCODE_BIN" 2>/dev/null; then
@@ -36,7 +59,10 @@ if ! install -m 700 "$ROOT/scripts/zcode" "$ZCODE_BIN" 2>/dev/null; then
     || { echo "[ERROR] could not install the zcode command" >&2; exit 1; }
   case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
-    *) echo "[!] $HOME/.local/bin is not in PATH; add it to use the zcode command" >&2 ;;
+    *)
+      add_path_entry "$HOME/.local/bin"
+      echo "[!] restart the shell or run: source ~/.bashrc" >&2
+      ;;
   esac
 fi
 
