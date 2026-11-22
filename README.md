@@ -76,11 +76,9 @@ Logs are written to `~/.zcode-mobile/logs/`:
 - `dist/node_modules/` — runtime dependencies (provided by the release tarball)
 - `scripts/zcode` — the `zcode` CLI wrapper (installed to `$PREFIX/bin/zcode`)
 - `scripts/termux-official.sh` — workspace-aware launcher used by the wrapper
-- `scripts/termux-client.sh` — legacy Electron-bundle backend bridge (experimental; requires extracted AppImage assets)
 - `scripts/claim-mini-server.js` — local giveaway/claim HTTP page (auto-detects the JWT)
 - `scripts/patch-runtime.py` — applies the server/web patches to a built release
 - `claim/` — claim/OAuth/marketing API implementation and tests (`node claim/test-claim.js`, 16/16 mocked)
-- `backend/`, `web/` — legacy Node bootstrap and WebView shim (experimental; not used by the Termux CLI)
 
 ## Building from source
 

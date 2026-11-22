@@ -434,14 +434,6 @@ function createServer() {
   });
 }
 
-function startServer({ port = DEFAULT_PORT, host = '127.0.0.1' } = {}) {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.on('error', reject);
-    server.listen(port, host, () => resolve(server));
-  });
-}
-
 function startOAuthCallbackListener({ port = DEFAULT_CALLBACK_PORT, host = '127.0.0.1' } = {}) {
   const server = http.createServer(async (req, res) => {
     try {
@@ -512,7 +504,6 @@ module.exports = {
   runClaimAll,
   setCaptchaProvider,
   createServer,
-  startServer,
   startOAuthCallbackListener,
   routeRequest,
 };

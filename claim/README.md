@@ -10,9 +10,8 @@ uses a mocked `fetch` — nothing here contacts the real service during verifica
 | --- | --- |
 | `claim.js` | CommonJS module + standalone CLI; all endpoint calls, header construction, claim orchestration. |
 | `oauth-helper.js` | OAuth authorize URL builder, callback parser (`zcode://` and web redirect), state verification, token exchange. |
-| `claim-server.js` | Loopback HTTP bridge (`127.0.0.1`) for the Android app; persists JWT/deviceMid/seq. |
+| `claim-server.js` | Loopback HTTP bridge (`127.0.0.1`) for local claim clients; persists JWT/deviceMid/seq. |
 | `test-claim.js` | Dependency-injected mock-fetch self-test (`node claim/test-claim.js`). |
-| `integration.md` | Exact Android/backend wiring instructions. |
 
 ## Shared request contract
 

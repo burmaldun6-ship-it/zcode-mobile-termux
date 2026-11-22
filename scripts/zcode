@@ -66,13 +66,8 @@ fi
 if [ -z "$APP" ] || [ ! -d "$APP" ]; then
   APP="$HOME/zcode-mobile-termux"
 fi
-if [ -f "$APP/start.sh" ]; then
-  LAUNCHER="$APP/start.sh"
-  SERVER_JS="$APP/server/entry-http.js"
-else
-  LAUNCHER="$APP/scripts/termux-official.sh"
-  SERVER_JS="$APP/dist/server/entry-http.js"
-fi
+LAUNCHER="$APP/scripts/termux-official.sh"
+SERVER_JS="$APP/dist/server/entry-http.js"
 CLAIM_JS="$APP/scripts/claim-mini-server.js"
 
 TOKEN_FILE="$DATA/web-token"
