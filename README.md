@@ -80,8 +80,7 @@ Logs are written to `~/.zcode-mobile/logs/`:
 - `scripts/claim-mini-server.js` — local giveaway/claim HTTP page (auto-detects the JWT)
 - `scripts/patch-runtime.py` — applies the server/web patches to a built release
 - `claim/` — claim/OAuth/marketing API implementation and tests (`node claim/test-claim.js`, 16/16 mocked)
-- `backend/`, `web/` — Node bootstrap and WebView shim for the legacy APK build
-- `android/`, `builder/` — sources of the (experimental) Android APK build
+- `backend/`, `web/` — legacy Node bootstrap and WebView shim (experimental; not used by the Termux CLI)
 
 ## Building from source
 
