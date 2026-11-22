@@ -30,17 +30,18 @@ Real chat and claims require a ZCode/z.ai account. No credentials are bundled.
 curl -fsSL https://raw.githubusercontent.com/burmaldun6-ship-it/zcode-mobile-termux/main/install-remote.sh | bash
 ```
 
-The installer downloads the latest public release tarball via the GitHub API,
-extracts it to `~/zcode-mobile-termux`, runs `install.sh` for you and installs the
-`zcode` command. Then run `zcode start` from the folder the agent should work in.
+The installer resolves the newest release through the GitHub API (test builds are
+published as pre-releases, which `/releases/latest` ignores), extracts it to
+`~/zcode-mobile-termux`, runs `install.sh` for you and installs the `zcode` command.
+Then run `zcode start` from the folder the agent should work in.
 
 Or manually:
 
 1. Download `zcode-mobile-termux-*.tar.gz` from the Releases page.
 2. Extract it in Termux, for example:
    ```bash
-   mkdir -p ~/zcode-mobile && tar -xzf zcode-mobile-termux-*.tar.gz -C ~/zcode-mobile --strip-components=1
-   cd ~/zcode-mobile
+   mkdir -p ~/zcode-mobile-termux && tar -xzf zcode-mobile-termux-*.tar.gz -C ~/zcode-mobile-termux --strip-components=1
+   cd ~/zcode-mobile-termux
    bash install.sh
    cd ~/your-project        # the folder the agent should work in
    zcode start

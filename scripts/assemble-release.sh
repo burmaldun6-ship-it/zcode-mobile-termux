@@ -17,9 +17,15 @@ mkdir -p "$STAGE" "$OUT_DIR"
 
 tar -C "$ROOT" \
   --exclude=.git \
+  --exclude=.github \
   --exclude=dist-release \
   --exclude=dist \
   --exclude=node_modules \
+  --exclude=unpacked \
+  --exclude=upstream \
+  --exclude=__pycache__ \
+  --exclude='*.tar.gz' \
+  --exclude='*.tgz' \
   -cf - . | tar -C "$STAGE" -xf -
 
 mkdir -p "$STAGE/dist"
